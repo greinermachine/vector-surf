@@ -2,4 +2,6 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
-docs
+.vercel/
+.env*.local
+docs/

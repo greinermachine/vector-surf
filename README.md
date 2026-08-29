@@ -2,6 +2,8 @@
 
 Vector Surf is the standalone version of the original CSGO surf idea. It is an independent React/Vite project with its own package manifest, campaign state, tests, and production build.
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgreinermachine%2Fvector-surf)
+
 ## Play locally
 
 Use Node 22:
@@ -38,3 +40,7 @@ npm run lint
 npm test
 npm run build
 ```
+
+## Deploy to Vercel
+
+Import `greinermachine/vector-surf` in Vercel and deploy it with the committed settings. The project uses Node 22, installs with `npm ci`, builds with `npm run build`, and publishes `dist`. It has no required environment variables or backend services.

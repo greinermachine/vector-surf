@@ -233,11 +233,14 @@ const landing = followingLanding(s3e, 2.65, 96, 'wide-catch', 46, 12, -0.4);
 export const FIRST_SURF_MAP: SurfLevel = {
   id: FIRST_SURF_MAP_ID,
   number: 7,
+  mapNumber: 1,
   format: 'full-map',
   name: 'Alpine Flow',
   subtitle: 'Surf Map 01 · The Long Descent',
   briefing: 'Training complete. Link one uninterrupted line from the summit to the lake.',
   cue: 'SURF → BUILD SPEED → TRANSFER → FINISH. Falls return to the summit start.',
+  routeLabel: 'SUMMIT → LAKE',
+  resetLabel: 'SUMMIT',
   difficulty: 2,
   parTime: 44,
   palette: {

@@ -23,14 +23,21 @@ The game is desktop-first because mouse look uses the browser Pointer Lock API.
 - Mouse: look and gradually steer the momentum frame; pitch is visual only.
 - `F`: inspect the first-person knife.
 - `F3`: toggle player telemetry plus world collision wireframes, exact ramp bounds, face normals, and the active contact highlight.
-- `R`: restart the current training line or Alpine Flow run from its start.
+- `R`: restart the current tutorial or surf map from its one authored start.
 - `Escape`: release the mouse and pause.
 
 ## Campaign
 
-Every run begins from rest on a separate flat launch deck before the first bank. WASD provides responsive, friction-backed movement and Space jumps on launch decks and landing runways. The first five authored levels stay on a straight fall line while adding more transfers. Level six is the final combined training route: a broad, Utopia-inspired concrete bend that turns the player back through the world. Completing it unlocks Alpine Flow, the first full surf map: one uninterrupted timed line through mountain, ravine/cave, and open-descent environments. Completing a training line enters the next level immediately; the full map ends on a retry/results screen. Best times and peak velocities are stored in `localStorage` under `vector-surf:progress:v1`.
+The campaign is split into two clear sections:
 
-Every level has exactly one start and one finish. A run completes only after stable runway contact and passage through the exit gate; flying through the gate does not count. Training falls return to the level start, and Alpine Flow falls return to the summit start. Both paths preserve the current run clock, peak-velocity record, and reset count.
+- **Tutorial 01–06** teaches attachment, speed building, upward exits, air strafing, catches, and a combined line. Completing a tutorial enters the next tutorial immediately.
+- **Surf Maps 01–03** contains Alpine Flow, Parallax, and Canyon Signal. Each is a complete, continuous timed run with its own route, atmosphere, result screen, and personal best.
+
+Every run begins from rest on a separate flat launch deck before the first bank. WASD provides responsive, friction-backed movement and Space jumps on launch decks and landing runways. Completing Tutorial 06 unlocks Alpine Flow; completing each surf map unlocks the next. Best times and peak velocities are stored separately for every course in `localStorage` under `vector-surf:progress:v1`.
+
+Every course has exactly one start and one finish, with no checkpoints or teleports. A run completes only after stable runway contact and passage through the exit gate; flying through the gate does not count. Tutorial resets preserve the current learning-session clock and peak speed. A surf-map fall or manual restart returns to that map's start and begins a fresh timed attempt, while personal bests remain intact.
+
+The architecture and authored route decisions for the two-map expansion are recorded in [docs/surf-map-expansion.md](docs/surf-map-expansion.md).
 
 ## Verification
 

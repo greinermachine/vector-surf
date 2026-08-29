@@ -44,11 +44,15 @@ describe('standalone campaign shell', () => {
   it('starts with a level-based lock progression', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /Level grid/i }));
+    await user.click(screen.getByRole('button', { name: /Map select/i }));
+    expect(screen.getByRole('heading', { name: 'Tutorial' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Surf maps' })).toBeInTheDocument();
     const first = screen.getByRole('button', { name: /First Cut/i });
     const second = screen.getByRole('button', { name: /Crossfade/i });
+    const alpine = screen.getByRole('button', { name: /Alpine Flow/i });
     expect(first).toBeEnabled();
     expect(second).toBeDisabled();
+    expect(alpine).toBeDisabled();
     await user.click(first);
     expect(screen.getByTestId('surf-game')).toHaveTextContent('level 1');
   });
@@ -86,17 +90,46 @@ describe('standalone campaign shell', () => {
       peakSpeeds: {},
     }));
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /Level grid/i }));
+    await user.click(screen.getByRole('button', { name: /Map select/i }));
     await user.click(screen.getByRole('button', { name: /Alpine Flow/i }));
     await user.click(screen.getByTestId('surf-game'));
 
     expect(screen.getByRole('heading', { name: 'Alpine Flow' })).toBeInTheDocument();
     expect(screen.getAllByText('00:08.000')).toHaveLength(2);
     expect(screen.getByRole('button', { name: /Retry/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Map select/i })).toBeEnabled();
     expect(JSON.parse(window.localStorage.getItem('vector-surf:progress:v1')!).bestTimes['alpine-flow']).toBe(8);
 
     await user.click(screen.getByRole('button', { name: /Retry/i }));
     expect(screen.getByTestId('surf-game')).toHaveTextContent('level 7');
+  });
+
+  it('keeps all three surf-map results separate and returns to map select', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('vector-surf:progress:v1', JSON.stringify({
+      version: 1,
+      unlockedLevels: 9,
+      bestTimes: {},
+      peakSpeeds: {},
+    }));
+    render(<App />);
+
+    for (const [name, levelNumber] of [
+      ['Alpine Flow', 7],
+      ['Parallax', 8],
+      ['Canyon Signal', 9],
+    ] as const) {
+      await user.click(screen.getByRole('button', { name: /Map select/i }));
+      await user.click(screen.getByRole('button', { name: new RegExp(name, 'i') }));
+      expect(screen.getByTestId('surf-game')).toHaveTextContent(`level ${levelNumber}`);
+      await user.click(screen.getByTestId('surf-game'));
+      expect(screen.getByRole('heading', { name })).toBeInTheDocument();
+    }
+
+    expect(JSON.parse(window.localStorage.getItem('vector-surf:progress:v1')!).bestTimes).toEqual({
+      'alpine-flow': 8,
+      parallax: 8,
+      'canyon-signal': 8,
+    });
   });
 });

@@ -1,5 +1,7 @@
 import { Vector3 } from 'three';
+import { CANYON_SIGNAL_MAP } from '../levels/maps/canyonSignal/config';
 import { FIRST_SURF_MAP } from '../levels/maps/firstSurfMap/config';
+import { PARALLAX_MAP } from '../levels/maps/parallax/config';
 import { SURF_TUNING } from './config';
 import { dualizeRamp } from './dualRamp';
 import { getRampBasis, rampHeading, rampSurfacePoint } from './ramp';
@@ -282,6 +284,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
   {
     id: 'first-cut',
     number: 1,
+    format: 'training',
     name: 'First Cut',
     subtitle: 'Attach to the face',
     briefing: 'Use WASD and Space on the start deck. Hold A on the right face, then draw a smooth line with the mouse.',
@@ -299,6 +302,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
   {
     id: 'crossfade',
     number: 2,
+    format: 'training',
     name: 'Crossfade',
     subtitle: 'Descend to accelerate',
     briefing: 'Hold D on the left face. Aim down the surface for speed, then draw the line upward before the exit.',
@@ -316,6 +320,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
   {
     id: 'switchback',
     number: 3,
+    format: 'training',
     name: 'Switchback',
     subtitle: 'Curve up to exit',
     briefing: 'Build speed low, then draw a smooth path back upward before each ramp ends.',
@@ -333,6 +338,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
   {
     id: 'overdrive',
     number: 4,
+    format: 'training',
     name: 'Overdrive',
     subtitle: 'Air strafe in sync',
     briefing: 'In air, pair A with a smooth mouse turn left or D with a smooth turn right.',
@@ -350,6 +356,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
   {
     id: 'black-ice',
     number: 5,
+    format: 'training',
     name: 'Black Ice',
     subtitle: 'Catch the next ramp',
     briefing: 'Match the next face before contact. Shallow catches preserve speed; direct impacts spend it.',
@@ -367,6 +374,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
   {
     id: 'last-light',
     number: 6,
+    format: 'training',
     name: 'Last Light',
     subtitle: 'Link the full line',
     briefing: 'Combine descent, upward exits, synchronized air strafes, and shallow catches through the bend.',
@@ -382,7 +390,12 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
     goal: { rampId: l6Land.id, position: eyePosition(l6Land, 0, 48), radius: 5.4 },
   },
   FIRST_SURF_MAP,
+  PARALLAX_MAP,
+  CANYON_SIGNAL_MAP,
 ] as const;
+
+export const TUTORIAL_LEVELS = SURF_LEVELS.filter((level) => level.format === 'training');
+export const FULL_SURF_MAPS = SURF_LEVELS.filter((level) => level.format === 'full-map');
 
 export function getSurfLevel(index: number): SurfLevel {
   return SURF_LEVELS[Math.max(0, Math.min(SURF_LEVELS.length - 1, index))];

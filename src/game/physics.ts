@@ -577,8 +577,15 @@ function resetPlayerInPlace(state: SurfPlayerState, level: SurfLevel) {
   const peakSpeed = state.peakSpeed;
   const restored = createSurfPlayer(level, state.resets + 1);
   copyPlayerState(state, restored);
-  state.elapsed = elapsed;
-  state.peakSpeed = Math.max(peakSpeed, restored.peakSpeed);
+  if (level.format === 'full-map') {
+    // A full-map reset begins a fresh timed attempt from its one authored spawn.
+    state.elapsed = 0;
+    state.peakSpeed = restored.peakSpeed;
+  } else {
+    // Tutorial resets preserve the learning session telemetry.
+    state.elapsed = elapsed;
+    state.peakSpeed = Math.max(peakSpeed, restored.peakSpeed);
+  }
 }
 
 export function resetSurfPlayer(state: SurfPlayerState, level: SurfLevel): SurfPlayerState {

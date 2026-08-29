@@ -52,21 +52,24 @@ export type LevelPalette = {
 };
 
 export type SurfWorldSettings = {
-  kind: 'alpine-map';
+  kind: 'alpine-map' | 'parallax-map' | 'canyon-signal-map';
   fogNear: number;
   fogFar: number;
   cameraFar: number;
-  waterY: number;
+  waterY?: number;
 };
 
 export type SurfLevel = {
   id: string;
   number: number;
+  mapNumber?: number;
   format?: 'training' | 'full-map';
   name: string;
   subtitle: string;
   briefing: string;
   cue: string;
+  routeLabel?: string;
+  resetLabel?: string;
   difficulty: number;
   parTime: number;
   palette: LevelPalette;

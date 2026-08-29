@@ -27,7 +27,9 @@ import {
   type RampPoint,
 } from '../game/rampGeometry';
 import type { RampDefinition, SurfLevel } from '../game/types';
+import { CanyonSignalMap } from '../levels/maps/canyonSignal/CanyonSignalMap';
 import { FirstSurfMap } from '../levels/maps/firstSurfMap/FirstSurfMap';
+import { ParallaxMap } from '../levels/maps/parallax/ParallaxMap';
 
 type Point = RampPoint;
 
@@ -374,12 +376,23 @@ export function CourseWorld({
   activeRampId?: string;
 }) {
   const bounds = useMemo(() => courseBounds(level), [level]);
-  const isFullMap = level.world?.kind === 'alpine-map';
+  const environment = (() => {
+    switch (level.world?.kind) {
+      case 'alpine-map':
+        return <FirstSurfMap level={level} />;
+      case 'parallax-map':
+        return <ParallaxMap level={level} />;
+      case 'canyon-signal-map':
+        return <CanyonSignalMap level={level} />;
+      default:
+        return <Architecture level={level} />;
+    }
+  })();
   return (
     <>
       <CourseRamps level={level} debug={debug} activeRampId={activeRampId} />
       <RouteConnectors level={level} />
-      {isFullMap ? <FirstSurfMap level={level} /> : <Architecture level={level} />}
+      {environment}
       <FinishGate level={level} />
       <VelocityStreaks level={level} />
       <mesh

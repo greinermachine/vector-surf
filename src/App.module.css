@@ -255,7 +255,31 @@
 .sectionHeading h1 { margin: 0; font-size: clamp(2.6rem, 6vw, 5.5rem); line-height: 0.92; letter-spacing: -0.065em; }
 .sectionHeading > span { color: rgb(255 255 255 / 0.46); font: 0.7rem/1.5 var(--mono); }
 
+.levelGroup + .levelGroup { margin-top: clamp(3.5rem, 8vh, 6rem); }
+.levelGroupHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin: 0 0 1rem;
+  padding-left: 0.85rem;
+  border-left: 2px solid rgb(202 255 55 / 0.7);
+}
+.levelGroupHeading h2 {
+  margin: 0;
+  font: 720 clamp(1.15rem, 2.2vw, 1.7rem)/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.levelGroupHeading span {
+  color: rgb(255 255 255 / 0.4);
+  font: 0.62rem/1.4 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .levelGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: rgb(255 255 255 / 0.12); border: 1px solid rgb(255 255 255 / 0.12); }
+.levelGrid[data-course-grid="surf-maps"] .levelCard { min-height: 19rem; background: #0d1212; }
 .levelCard {
   --level-accent: #caff37;
   position: relative;
@@ -309,6 +333,7 @@
   .menuFooter span:last-child { display: none; }
   .levelGrid { grid-template-columns: 1fr; }
   .sectionHeading { align-items: flex-start; flex-direction: column; }
+  .levelGroupHeading { align-items: flex-start; flex-direction: column; gap: 0.45rem; }
   .levelCard { min-height: 15rem; }
   .resultMeta { grid-template-columns: 1fr; }
 }

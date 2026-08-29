@@ -34,6 +34,7 @@ import {
 } from './physics';
 
 const TRAINING_LEVELS = SURF_LEVELS.filter((level) => level.format !== 'full-map');
+const FULL_MAPS = SURF_LEVELS.filter((level) => level.format === 'full-map');
 
 function input(strafe = 0, move = 0, longitudinalHeld = move !== 0, jump = false) {
   return { strafe, move, longitudinalHeld, jump, lookDeltaX: 0, lookDeltaY: 0 };
@@ -73,6 +74,12 @@ function scriptedRide(levelIndex: number, maximumSeconds = 36) {
   let airFrames = 0;
   const airSegments: number[] = [];
   const catchSpeedRatios: number[] = [];
+  const approachSamples = new Map<string, {
+    outside: number;
+    clearance: number;
+    local: [number, number];
+    position: [number, number, number];
+  }>();
   const target = new Vector3();
   const currentAim = new Vector3();
   const nextAim = new Vector3();
@@ -176,6 +183,39 @@ function scriptedRide(levelIndex: number, maximumSeconds = 36) {
     );
     state = advanced.state;
     accumulator = advanced.accumulator;
+    if (next) {
+      const nextBasis = getRampBasis(next);
+      const nextCoordinates = rampCoordinates(next, state.position.x, state.position.z);
+      const lateralOutside = Math.max(0, Math.abs(nextCoordinates.lateral) - next.width / 2);
+      const forwardOutside = Math.max(
+        0,
+        -nextCoordinates.distance,
+        nextCoordinates.distance - nextBasis.length,
+      );
+      const outside = Math.hypot(lateralOutside, forwardOutside);
+      const nextSurface = rampSurfacePoint(
+        next,
+        nextCoordinates.lateral,
+        nextCoordinates.distance,
+      );
+      const sample = {
+        outside,
+        clearance: state.position.y - (nextSurface.y + SURF_TUNING.playerHeight),
+        local: [nextCoordinates.lateral, nextCoordinates.distance] as [number, number],
+        position: state.position.toArray() as [number, number, number],
+      };
+      const previousSample = approachSamples.get(next.id);
+      if (
+        !previousSample ||
+        sample.outside < previousSample.outside - 1e-6 ||
+        (
+          Math.abs(sample.outside - previousSample.outside) < 1e-6 &&
+          Math.abs(sample.clearance) < Math.abs(previousSample.clearance)
+        )
+      ) {
+        approachSamples.set(next.id, sample);
+      }
+    }
     if (
       contactStateBeforeStep === 'air' &&
       state.contactState === 'ramp' &&
@@ -206,7 +246,14 @@ function scriptedRide(levelIndex: number, maximumSeconds = 36) {
     furthestRouteIndex = Math.max(furthestRouteIndex, routeIndex, contactIndex);
   }
   if (airFrames > 0) airSegments.push(airFrames);
-  return { state, furthestRouteIndex, events, airSegments, catchSpeedRatios };
+  return {
+    state,
+    furthestRouteIndex,
+    events,
+    airSegments,
+    catchSpeedRatios,
+    approachSamples: Object.fromEntries(approachSamples),
+  };
 }
 
 describe('standalone surf physics', () => {
@@ -600,6 +647,24 @@ describe('standalone surf physics', () => {
     expect(afterFall.resets).toBe(1);
   });
 
+  it.each(FULL_MAPS.map((level) => [level.id, SURF_LEVELS.indexOf(level)] as const))(
+    '%s starts a fresh timed attempt on reset',
+    (_levelId, levelIndex) => {
+      const level = getSurfLevel(levelIndex);
+      const state = createSurfPlayer(level);
+      state.elapsed = 31.25;
+      state.peakSpeed = 87;
+      state.position.copy(level.goal.position);
+      state.velocity.set(20, -4, 61);
+      const restored = resetSurfPlayer(state, level);
+      expect(restored.position.distanceTo(level.spawn.position)).toBeLessThan(1e-8);
+      expect(restored.velocity.length()).toBe(level.spawn.speed);
+      expect(restored.elapsed).toBe(0);
+      expect(restored.peakSpeed).toBe(level.spawn.speed);
+      expect(restored.resets).toBe(1);
+    },
+  );
+
   it('applies a mouse delta once even across multiple fixed substeps', () => {
     const level = getSurfLevel(0);
     const state = createSurfPlayer(level);
@@ -661,11 +726,13 @@ describe('standalone surf physics', () => {
     },
   );
 
-  it('keeps the full map reachable across its deliberately longer transfers', () => {
-    const levelIndex = SURF_LEVELS.findIndex((level) => level.format === 'full-map');
+  it.each(FULL_MAPS.map((level) => [level.id, SURF_LEVELS.indexOf(level)] as const))(
+    'keeps full map %s reachable across its deliberately longer transfers',
+    (_levelId, levelIndex) => {
     const level = getSurfLevel(levelIndex);
-    const outcome = scriptedRide(levelIndex, 100);
+    const outcome = scriptedRide(levelIndex, 120);
     const diagnostics = JSON.stringify({
+      level: level.id,
       furthestRouteIndex: outcome.furthestRouteIndex,
       finalRouteIndex: rampRouteGroups(level).length - 1,
       position: outcome.state.position.toArray(),
@@ -674,6 +741,18 @@ describe('standalone surf physics', () => {
       contact: outcome.state.contactRampId,
       airSegments: outcome.airSegments,
       minimumCatchSpeedRatio: Math.min(...outcome.catchSpeedRatios),
+      approachSamples: outcome.approachSamples,
+      authoredRoute: rampRouteGroups(level).map((group) => {
+        const ramp = primaryRouteRamp(group);
+        return {
+          id: group.id,
+          start: ramp.start,
+          end: ramp.end,
+          startY: ramp.startY,
+          endY: ramp.endY,
+          width: ramp.dual?.totalWidth ?? ramp.width,
+        };
+      }),
       events: outcome.events.slice(0, 100),
     });
     expect(outcome.furthestRouteIndex, diagnostics).toBe(rampRouteGroups(level).length - 1);
@@ -681,5 +760,6 @@ describe('standalone surf physics', () => {
     expect(outcome.state.resets, diagnostics).toBe(0);
     expect(Math.max(...outcome.airSegments), diagnostics).toBeGreaterThanOrEqual(30);
     expect(Math.min(...outcome.catchSpeedRatios), diagnostics).toBeGreaterThan(0.6);
-  });
+    },
+  );
 });

@@ -14,7 +14,11 @@ import {
 } from 'three';
 import { SURF_TUNING } from '../game/config';
 import { createKeyState, inputFromKeys, writeKeyState } from '../game/input';
-import { getSurfLevel, SURF_LEVELS } from '../game/levels';
+import {
+  FULL_SURF_MAPS,
+  getSurfLevel,
+  TUTORIAL_LEVELS,
+} from '../game/levels';
 import {
   advanceWithFixedSteps,
   computeCameraRight,
@@ -83,6 +87,9 @@ export function SurfGame({
     : freshTelemetry;
   const resetPulse = resetSnapshot.levelId === level.id ? resetSnapshot.value : 0;
   const isFullMap = level.format === 'full-map';
+  const mapNumber = level.mapNumber ?? 1;
+  const routeLabel = level.routeLabel ?? 'START → FINISH';
+  const resetLabel = level.resetLabel ?? 'START';
 
   useEffect(() => {
     const pointerLockTarget = shellRef.current;
@@ -227,7 +234,11 @@ export function SurfGame({
       <header className={styles.hudTop}>
         <div className={styles.hudBrand}><b>V</b><span>VECTOR//SURF</span></div>
         <div className={styles.levelIdentity}>
-          <span>LEVEL {String(level.number).padStart(2, '0')} / {String(SURF_LEVELS.length).padStart(2, '0')}</span>
+          <span>
+            {isFullMap
+              ? `SURF MAP ${String(mapNumber).padStart(2, '0')} / ${String(FULL_SURF_MAPS.length).padStart(2, '0')}`
+              : `TUTORIAL ${String(level.number).padStart(2, '0')} / ${String(TUTORIAL_LEVELS.length).padStart(2, '0')}`}
+          </span>
           <strong>{level.name}</strong>
         </div>
         <div className={styles.timer}><span>RUN TIME</span><strong>{formatTime(telemetry.elapsed)}</strong></div>
@@ -254,7 +265,7 @@ export function SurfGame({
           {isFullMap ? 'FULL COURSE' : telemetry.movementState}
         </span>
         {isFullMap ? (
-          <span data-active>SUMMIT → LAKE</span>
+          <span data-active>{routeLabel}</span>
         ) : (
           <span data-active={telemetry.recommendedStrafe !== null}>
             {telemetry.recommendedStrafe
@@ -290,7 +301,7 @@ export function SurfGame({
 
       {resetPulse > 0 && (
         <div className={styles.resetFlash} key={resetPulse} role="status">
-          <span>{isFullMap ? 'MAP RESET / BACK TO SUMMIT' : 'LINE RESET / BACK TO START'}</span>
+          <span>{isFullMap ? `MAP RESET / BACK TO ${resetLabel}` : 'LINE RESET / BACK TO START'}</span>
         </div>
       )}
 
@@ -299,8 +310,8 @@ export function SurfGame({
           <section className={styles.pausePanel} aria-labelledby="line-title">
             <p>
               {isFullMap && !entered
-                ? 'TRAINING COMPLETE / SURF MAP 01'
-                : `LEVEL ${String(level.number).padStart(2, '0')} / ${level.subtitle}`}
+                ? `FULL COURSE / SURF MAP ${String(mapNumber).padStart(2, '0')}`
+                : `${isFullMap ? 'SURF MAP' : 'TUTORIAL'} ${String(isFullMap ? mapNumber : level.number).padStart(2, '0')} / ${level.subtitle}`}
             </p>
             <h1 id="line-title">{entered ? 'Line paused.' : level.name}</h1>
             <span>{entered ? 'Your run is frozen at the current position.' : level.briefing}</span>
@@ -309,7 +320,7 @@ export function SurfGame({
                 <>
                   <div><kbd>A</kbd><kbd>D</kbd><b>HOLD THE LINE</b></div>
                   <div><kbd>MOUSE</kbd><b>READ THE TRANSFER</b></div>
-                  <div><kbd>R</kbd><b>RESTART FROM SUMMIT</b></div>
+                  <div><kbd>R</kbd><b>RESTART FROM {resetLabel}</b></div>
                 </>
               ) : (
                 <>
@@ -326,7 +337,7 @@ export function SurfGame({
               {entered ? 'Resume line' : isFullMap ? 'Begin map' : 'Enter line'} <span>→</span>
             </button>
             <button className={styles.exitButton} type="button" onClick={leave}>Exit to levels</button>
-            <small>{level.cue} · Escape pauses · R returns to the start · F3 physics debug</small>
+            <small>{level.cue} · Escape pauses · R returns to {resetLabel.toLowerCase()} · F3 physics debug</small>
           </section>
         </div>
       )}

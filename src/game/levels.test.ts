@@ -18,7 +18,8 @@ import { sampleRampSurface } from './physics';
 import type { RampDefinition } from './types';
 
 const trainingLevels = SURF_LEVELS.filter((level) => level.format !== 'full-map');
-const fullMap = SURF_LEVELS.find((level) => level.format === 'full-map')!;
+const fullMaps = SURF_LEVELS.filter((level) => level.format === 'full-map');
+const alpineFlow = fullMaps.find((level) => level.id === 'alpine-flow')!;
 const route = (level: (typeof SURF_LEVELS)[number]) => rampRouteGroups(level);
 const banks = (index: number) => route(trainingLevels[index])
   .map((group) => primaryRouteRamp(group))
@@ -70,11 +71,15 @@ describe('authored level campaign', () => {
       route(level).reduce((sum, group) => sum + getRampBasis(primaryRouteRamp(group)).length, 0)
     ));
     expect(lengths).toEqual([...lengths].sort((a, b) => a - b));
-    const fullMapLength = route(fullMap).reduce(
-      (sum, group) => sum + getRampBasis(primaryRouteRamp(group)).length,
-      0,
-    );
-    expect(fullMapLength).toBeGreaterThan(lengths.at(-1)! * 1.9);
+    expect(fullMaps).toHaveLength(3);
+    expect(fullMaps.map((level) => level.mapNumber)).toEqual([1, 2, 3]);
+    for (const fullMap of fullMaps) {
+      const fullMapLength = route(fullMap).reduce(
+        (sum, group) => sum + getRampBasis(primaryRouteRamp(group)).length,
+        0,
+      );
+      expect(fullMapLength).toBeGreaterThan(lengths.at(-1)! * 1.9);
+    }
     expect(SURF_LEVELS.every((level) => level.spawn.speed === 0)).toBe(true);
   });
 
@@ -86,12 +91,21 @@ describe('authored level campaign', () => {
     }
   });
 
-  it('gives the full map one continuous start-to-finish route without checkpoints', () => {
-    expect(fullMap.ramps.filter((ramp) => ramp.kind === 'start')).toHaveLength(1);
-    expect(fullMap.ramps.filter((ramp) => ramp.kind === 'landing')).toHaveLength(1);
-    expect(route(fullMap).filter((group) => primaryRouteRamp(group).kind === 'bank')).toHaveLength(16);
-    expect('checkpoints' in fullMap).toBe(false);
-    expect(fullMap.world?.kind).toBe('alpine-map');
+  it('gives every surf map one continuous start-to-finish route without checkpoints', () => {
+    for (const fullMap of fullMaps) {
+      expect(fullMap.ramps.filter((ramp) => ramp.kind === 'start')).toHaveLength(1);
+      expect(fullMap.ramps.filter((ramp) => ramp.kind === 'landing')).toHaveLength(1);
+      expect(route(fullMap).filter((group) => primaryRouteRamp(group).kind === 'bank').length)
+        .toBeGreaterThanOrEqual(14);
+      expect('checkpoints' in fullMap).toBe(false);
+      expect(fullMap.routeLabel).toBeTruthy();
+      expect(fullMap.resetLabel).toBeTruthy();
+    }
+    expect(fullMaps.map((level) => level.world?.kind)).toEqual([
+      'alpine-map',
+      'parallax-map',
+      'canyon-signal-map',
+    ]);
   });
 
   it.each(SURF_LEVELS.map((level) => [level.id, level] as const))(
@@ -206,7 +220,11 @@ describe('authored level campaign', () => {
     }
     const headings = route(trainingLevels[5]).map((group) => rampHeading(primaryRouteRamp(group)));
     expect(Math.max(...headings) - Math.min(...headings)).toBeGreaterThan(Math.PI * 0.9);
-    expect(new Set(route(fullMap).map((group) => rampHeading(primaryRouteRamp(group)).toFixed(2))).size).toBeGreaterThan(10);
+    for (const fullMap of fullMaps) {
+      expect(new Set(route(fullMap).map((group) => (
+        rampHeading(primaryRouteRamp(group)).toFixed(2)
+      ))).size).toBeGreaterThan(10);
+    }
   });
 
   it('uses progressively larger transfers—not precision-width catches—to raise difficulty', () => {
@@ -221,18 +239,24 @@ describe('authored level campaign', () => {
       [...averageTransfers.slice(0, 5)].sort((a, b) => a - b),
     );
     expect(averageTransfers[5]).toBeGreaterThan(averageTransfers[0] * 2);
-    const fullMapGroups = route(fullMap);
-    const fullMapTransfers = fullMapGroups.slice(1).map((group, index) => (
-      routeTransferDistance(fullMapGroups[index], group)
+    for (const fullMap of fullMaps) {
+      const transfers = route(fullMap).slice(1).map((group, index) => (
+        routeTransferDistance(route(fullMap)[index], group)
+      ));
+      expect(Math.max(...transfers)).toBeGreaterThan(60);
+    }
+    const alpineGroups = route(alpineFlow);
+    const alpineTransfers = alpineGroups.slice(1).map((group, index) => (
+      routeTransferDistance(alpineGroups[index], group)
     ));
-    expect(Math.max(...fullMapTransfers)).toBeGreaterThan(100);
+    expect(Math.max(...alpineTransfers)).toBeGreaterThan(100);
     const transferTo = (idFragment: string) => {
-      const targetIndex = fullMapGroups.findIndex((group) => (
+      const targetIndex = alpineGroups.findIndex((group) => (
         group.ramps.some((ramp) => ramp.id.includes(idFragment))
       ));
       return routeTransferDistance(
-        fullMapGroups[targetIndex - 1],
-        fullMapGroups[targetIndex],
+        alpineGroups[targetIndex - 1],
+        alpineGroups[targetIndex],
       );
     };
     // Authored 76- and 110-unit approach gaps remain long even after this
@@ -251,6 +275,15 @@ describe('authored level campaign', () => {
     expect(trainingLevels.slice(2).map((level) => (
       route(level).filter((group) => group.ramps.length === 2).length
     ))).toEqual([1, 2, 3, 3]);
-    expect(route(fullMap).filter((group) => group.ramps.length === 2)).toHaveLength(7);
+    expect(route(alpineFlow).filter((group) => group.ramps.length === 2)).toHaveLength(7);
+    expect(fullMaps.slice(1).every((level) => (
+      route(level).filter((group) => group.ramps.length === 2).length >= 4
+    ))).toBe(true);
+    for (const fullMap of fullMaps) {
+      expect(route(fullMap)
+        .map((group) => primaryRouteRamp(group))
+        .filter((ramp) => ramp.kind === 'bank')
+        .every((ramp) => effectiveWidth(ramp) >= 36)).toBe(true);
+    }
   });
 });

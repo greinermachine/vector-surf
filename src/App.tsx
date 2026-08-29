@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { SurfGame } from './components/SurfGame';
-import { SURF_LEVELS } from './game/levels';
+import {
+  FULL_SURF_MAPS,
+  SURF_LEVELS,
+  TUTORIAL_LEVELS,
+} from './game/levels';
 import {
   formatTime,
   parseProgress,
@@ -80,7 +84,7 @@ export function App() {
     setProgress(nextProgress);
     saveProgress(nextProgress);
     const nextLevelIndex = result.levelIndex + 1;
-    if (nextLevelIndex < SURF_LEVELS.length) {
+    if (level.format === 'training' && nextLevelIndex < SURF_LEVELS.length) {
       setScreen({ name: 'playing', levelIndex: nextLevelIndex });
       return;
     }
@@ -105,15 +109,20 @@ export function App() {
 
   if (screen.name === 'complete') {
     const level = SURF_LEVELS[screen.levelIndex];
+    const mapNumber = level.mapNumber ?? 1;
     return (
-      <main className={styles.page} data-screen="complete">
+      <main
+        className={styles.page}
+        data-screen="complete"
+        style={{ '--level-accent': level.palette.accent } as React.CSSProperties}
+      >
         <header className={styles.topbar}>
           <Brand />
-          <span className={styles.build}>SURF MAP 01 / COMPLETE</span>
+          <span className={styles.build}>SURF MAP {String(mapNumber).padStart(2, '0')} / COMPLETE</span>
         </header>
 
         <section className={styles.completeSection} aria-labelledby="complete-heading">
-          <p className={styles.eyebrow}>Map complete / summit to lake</p>
+          <p className={styles.eyebrow}>Map complete / {(level.routeLabel ?? 'start → finish').toLowerCase()}</p>
           <h1 className={styles.completeTitle} id="complete-heading">
             {level.name}
           </h1>
@@ -139,7 +148,7 @@ export function App() {
               type="button"
               onClick={() => setScreen({ name: 'levels' })}
             >
-              Continue
+              Map select
             </button>
           </div>
         </section>
@@ -148,6 +157,36 @@ export function App() {
   }
 
   if (screen.name === 'levels') {
+    const renderLevelCard = (level: (typeof SURF_LEVELS)[number]) => {
+      const index = SURF_LEVELS.indexOf(level);
+      const unlocked = index < progress.unlockedLevels;
+      const displayNumber = level.format === 'full-map'
+        ? level.mapNumber ?? index - TUTORIAL_LEVELS.length + 1
+        : level.number;
+      return (
+        <button
+          className={styles.levelCard}
+          key={level.id}
+          type="button"
+          disabled={!unlocked}
+          onClick={() => startLevel(index)}
+          style={{ '--level-accent': level.palette.accent } as React.CSSProperties}
+        >
+          <span className={styles.levelNumber}>{String(displayNumber).padStart(2, '0')}</span>
+          <span className={styles.levelLock}>
+            {unlocked ? level.format === 'full-map' ? 'SURF MAP' : 'TUTORIAL' : 'LOCKED'}
+          </span>
+          <span className={styles.levelName}>{level.name}</span>
+          <span className={styles.levelSubtitle}>{level.subtitle}</span>
+          <span className={styles.cardDivider} />
+          <span className={styles.levelMeta}>
+            <span>BEST <b>{formatTime(progress.bestTimes[level.id])}</b></span>
+            <span>PEAK <b>{progress.peakSpeeds[level.id]?.toFixed(1) ?? '--.-'} u/s</b></span>
+          </span>
+          <Difficulty value={level.difficulty} />
+        </button>
+      );
+    };
     return (
       <main className={styles.page} data-screen="levels">
         <header className={styles.topbar}>
@@ -161,38 +200,29 @@ export function App() {
           <div className={styles.sectionHeading}>
             <div>
               <p>Campaign / {progress.unlockedLevels} of {SURF_LEVELS.length} unlocked</p>
-              <h1 id="level-heading">Select a line</h1>
+              <h1 id="level-heading">Select a course</h1>
             </div>
-            <span>Completion unlocks the next level.</span>
+            <span>Tutorials teach the movement. Surf maps are complete timed runs.</span>
           </div>
 
-          <div className={styles.levelGrid}>
-            {SURF_LEVELS.map((level, index) => {
-              const unlocked = index < progress.unlockedLevels;
-              return (
-                <button
-                  className={styles.levelCard}
-                  key={level.id}
-                  type="button"
-                  disabled={!unlocked}
-                  onClick={() => startLevel(index)}
-                  style={{ '--level-accent': level.palette.accent } as React.CSSProperties}
-                >
-                  <span className={styles.levelNumber}>{String(level.number).padStart(2, '0')}</span>
-                  <span className={styles.levelLock}>
-                    {unlocked ? level.format === 'full-map' ? 'SURF MAP' : 'AVAILABLE' : 'LOCKED'}
-                  </span>
-                  <span className={styles.levelName}>{level.name}</span>
-                  <span className={styles.levelSubtitle}>{level.subtitle}</span>
-                  <span className={styles.cardDivider} />
-                  <span className={styles.levelMeta}>
-                    <span>BEST <b>{formatTime(progress.bestTimes[level.id])}</b></span>
-                    <span>PEAK <b>{progress.peakSpeeds[level.id]?.toFixed(1) ?? '--.-'} u/s</b></span>
-                  </span>
-                  <Difficulty value={level.difficulty} />
-                </button>
-              );
-            })}
+          <div className={styles.levelGroup} aria-labelledby="tutorial-heading">
+            <div className={styles.levelGroupHeading}>
+              <h2 id="tutorial-heading">Tutorial</h2>
+              <span>01–06 / Learn the line</span>
+            </div>
+            <div className={styles.levelGrid} data-course-grid="tutorial">
+              {TUTORIAL_LEVELS.map(renderLevelCard)}
+            </div>
+          </div>
+
+          <div className={styles.levelGroup} aria-labelledby="surf-maps-heading">
+            <div className={styles.levelGroupHeading}>
+              <h2 id="surf-maps-heading">Surf maps</h2>
+              <span>Three continuous timed runs</span>
+            </div>
+            <div className={styles.levelGrid} data-course-grid="surf-maps">
+              {FULL_SURF_MAPS.map(renderLevelCard)}
+            </div>
           </div>
         </section>
       </main>
@@ -216,14 +246,14 @@ export function App() {
         <p className={styles.eyebrow}>First-person momentum trial</p>
         <h1><span>VECTOR</span><span>SURF</span></h1>
         <p className={styles.heroCopy}>
-          Learn the line through six focused trials, then carry your velocity into the first full surf map.
+          Learn the line through six focused tutorials, then chase flow and faster times across three complete surf maps.
         </p>
         <div className={styles.menuActions}>
           <button className={styles.primaryButton} type="button" onClick={() => startLevel(continueIndex)}>
             Enter / {continueLevel.name} <span>→</span>
           </button>
           <button className={styles.secondaryButton} type="button" onClick={() => setScreen({ name: 'levels' })}>
-            Level grid
+            Map select
           </button>
         </div>
       </section>
@@ -238,7 +268,7 @@ export function App() {
       </aside>
 
       <footer className={styles.menuFooter}>
-        <span>{progress.unlockedLevels}/{SURF_LEVELS.length} LINES OPEN</span>
+        <span>{progress.unlockedLevels}/{SURF_LEVELS.length} COURSES OPEN</span>
         <span>MOUSE LOOK · ESC PAUSE</span>
       </footer>
     </main>

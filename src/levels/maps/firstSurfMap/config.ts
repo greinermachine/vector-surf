@@ -207,28 +207,28 @@ const s1bDual = dualizeRamp(s1b, 'map01-s1-b-wedge');
 const s1c = followingBank(s1b, { id: 'map01-s1-c', heading: 0.38, length: 80, profile: 'wide-catch', drop: 14, bankDirection: 1, gap: 30, entryDrop: 14, color: '#365a5e', edgeColor: '#9df4d0' });
 const s1d = followingBank(s1c, { id: 'map01-s1-d', heading: 0.58, length: 80, profile: 'normal', drop: 14, bankDirection: -1, gap: 36, entryDrop: 14, color: '#2d4f55', edgeColor: '#baf8df' });
 const s1dDual = dualizeRamp(s1d, 'map01-s1-d-wedge');
-const ridgeTransition = followingBank(s1d, { id: 'map01-ridge-transition', heading: 0.72, length: 62, profile: 'large', drop: 11, bankDirection: 1, gap: 28, entryDrop: 12, color: '#416467', edgeColor: '#efffce' });
+const ridgeTransition = followingBank(s1d, { id: 'map01-ridge-transition', heading: 0.72, length: 62, profile: 'large', drop: 11, bankDirection: 1, gap: 28, entryDrop: 8, color: '#416467', edgeColor: '#efffce' });
 
 // Ravine transition: the same uninterrupted route folds through the cave.
-const s2a = followingBank(ridgeTransition, { id: 'map01-s2-a', heading: 0.45, length: 72, profile: 'wide-catch', drop: 13, bankDirection: -1, gap: 44, approachLateral: -29, entryDrop: 42, color: '#414b4d', edgeColor: '#ffd28a' });
-const s2b = followingBank(s2a, { id: 'map01-s2-b', heading: 0.1, length: 74, profile: 'normal', drop: 13, bankDirection: 1, gap: 40, entryDrop: 22, color: '#343f42', edgeColor: '#ffe2ad' });
+const s2a = followingBank(ridgeTransition, { id: 'map01-s2-a', heading: 0.45, length: 72, profile: 'wide-catch', drop: 13, bankDirection: -1, gap: 44, approachLateral: -29, entryDrop: 35, color: '#414b4d', edgeColor: '#ffd28a' });
+const s2b = followingBank(s2a, { id: 'map01-s2-b', heading: 0.1, length: 74, profile: 'normal', drop: 13, bankDirection: 1, gap: 40, entryDrop: 6, color: '#343f42', edgeColor: '#ffe2ad' });
 const s2bDual = dualizeRamp(s2b, 'map01-s2-b-wedge');
-const s2c = followingBank(s2b, { id: 'map01-s2-c', heading: -0.35, length: 76, profile: 'normal', drop: 13, bankDirection: -1, gap: 48, entryDrop: 12, color: '#424b4e', edgeColor: '#ffd28a' });
-const s2d = followingBank(s2c, { id: 'map01-s2-d', heading: -0.8, length: 76, profile: 'normal', drop: 13, bankDirection: 1, gap: 42, entryDrop: 10, color: '#333d40', edgeColor: '#ffe2ad' });
+const s2c = followingBank(s2b, { id: 'map01-s2-c', heading: -0.35, length: 76, profile: 'normal', drop: 13, bankDirection: -1, gap: 48, entryDrop: 9, color: '#424b4e', edgeColor: '#ffd28a' });
+const s2d = followingBank(s2c, { id: 'map01-s2-d', heading: -0.8, length: 76, profile: 'normal', drop: 13, bankDirection: 1, gap: 42, entryDrop: 16, color: '#333d40', edgeColor: '#ffe2ad' });
 const s2dDual = dualizeRamp(s2d, 'map01-s2-d-wedge');
 const s2e = followingBank(s2d, { id: 'map01-s2-e', heading: -1.2, length: 78, profile: 'wide-catch', drop: 13, bankDirection: -1, gap: 52, entryDrop: 22, color: '#424c4e', edgeColor: '#ffd28a' });
-const caveExit = followingBank(s2e, { id: 'map01-cave-exit', heading: -0.85, length: 72, profile: 'wide-catch', drop: 10, bankDirection: 1, gap: 60, entryDrop: 42, entryFraction: 0.1, previousExitFraction: 0, color: '#4b5b5d', edgeColor: '#efffce' });
+const caveExit = followingBank(s2e, { id: 'map01-cave-exit', heading: -0.85, length: 72, profile: 'wide-catch', drop: 10, bankDirection: 1, gap: 30, entryDrop: 42, entryFraction: 0.1, approachLateral: 75, previousExitFraction: 0, color: '#4b5b5d', edgeColor: '#efffce' });
 
 // Open descent: larger profiles and signature gaps provide the payoff.
-const s3a = followingBank(caveExit, { id: 'map01-s3-a', heading: -1.85, length: 82, profile: 'large', drop: 15, bankDirection: -1, gap: 45, approachLateral: -15, previousExitFraction: -0.4, entryDrop: 20, color: '#315460', edgeColor: '#b7f4ff' });
-const s3b = followingBank(s3a, { id: 'map01-s3-b', heading: -2.25, length: 84, profile: 'large', drop: 16, bankDirection: 1, gap: 58, entryDrop: 42, entryFraction: 0.2, color: '#294a57', edgeColor: '#d6f9ff' });
+const s3a = followingBank(caveExit, { id: 'map01-s3-a', heading: -1.85, length: 82, profile: 'large', drop: 15, bankDirection: -1, gap: 88, approachLateral: 35, previousExitFraction: -0.4, entryDrop: -5, color: '#315460', edgeColor: '#b7f4ff' });
+const s3b = followingBank(s3a, { id: 'map01-s3-b', heading: -2.25, length: 84, profile: 'large', drop: 16, bankDirection: 1, gap: 58, entryDrop: 28, entryFraction: 0.2, color: '#294a57', edgeColor: '#d6f9ff' });
 const s3bDual = dualizeRamp(s3b, 'map01-s3-b-wedge');
 const s3c = followingBank(s3b, { id: 'map01-s3-c', heading: -2.65, length: 88, profile: 'signature', drop: 16, bankDirection: -1, gap: 76, entryDrop: 24, entryFraction: 0.1, color: '#325662', edgeColor: '#b7f4ff' });
 const s3cDual = dualizeRamp(s3c, 'map01-signature-wedge');
 const s3d = followingBank(s3c, { id: 'map01-s3-d', heading: -3.02, length: 88, profile: 'large', drop: 15, bankDirection: 1, gap: 62, entryDrop: 24, color: '#2a4b57', edgeColor: '#d6f9ff' });
 const s3dDual = dualizeRamp(s3d, 'map01-s3-d-wedge');
-const s3e = followingBank(s3d, { id: 'map01-s3-e', heading: 2.85, length: 90, profile: 'wide-catch', drop: 12, bankDirection: -1, gap: 110, entryDrop: 40, color: '#355965', edgeColor: '#b7f4ff' });
-const landing = followingLanding(s3e, 2.65, 96, 'wide-catch', 46, 12, -0.4);
+const s3e = followingBank(s3d, { id: 'map01-s3-e', heading: 2.85, length: 88, profile: 'wide-catch', drop: 12, bankDirection: -1, gap: 30, entryDrop: 35, approachLateral: -60, color: '#355965', edgeColor: '#b7f4ff' });
+const landing = followingLanding(s3e, 2.65, 94, 'wide-catch', 46, 12, -0.4);
 
 export const FIRST_SURF_MAP: SurfLevel = {
   id: FIRST_SURF_MAP_ID,
@@ -278,8 +278,8 @@ export const FIRST_SURF_MAP: SurfLevel = {
   ],
   goal: {
     rampId: landing.id,
-    position: eyePosition(landing, 0, 58),
-    radius: 9.5,
+    position: eyePosition(landing, -16, 58),
+    radius: 11,
   },
   world: {
     kind: 'alpine-map',

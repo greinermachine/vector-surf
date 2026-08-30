@@ -155,16 +155,21 @@ describe('authored level campaign', () => {
   );
 
   it.each(SURF_LEVELS.map((level) => [level.id, level] as const))(
-    '%s keeps every sampled collider point on its rendered profile and rejects points outside it',
+    '%s keeps every sampled collider point on its rendered profile envelope and rejects points outside it',
     (_id, level) => {
       for (const ramp of level.ramps) {
         expect(ramp.scaleProfile).toBeDefined();
         const profile = SURF_RAMP_PROFILES[ramp.scaleProfile!];
-        expect(ramp.width).toBeCloseTo(profile.width, 7);
-        expect(Math.abs(ramp.bankRadians)).toBeCloseTo(
-          ramp.kind === 'bank' ? profile.bankRadians : 0,
-          7,
-        );
+        // Critical catches may opt into a narrowly bounded width or bank-angle
+        // override while retaining the profile's visual scale and shell depth.
+        expect(ramp.width).toBeGreaterThanOrEqual(profile.width * 0.85);
+        expect(ramp.width).toBeLessThanOrEqual(profile.width * 1.12);
+        if (ramp.kind === 'bank') {
+          expect(Math.abs(ramp.bankRadians)).toBeGreaterThanOrEqual(profile.bankRadians * 0.97);
+          expect(Math.abs(ramp.bankRadians)).toBeLessThanOrEqual(profile.bankRadians * 1.15);
+        } else {
+          expect(ramp.bankRadians).toBe(0);
+        }
         const basis = getRampBasis(ramp);
         for (const lateralFraction of [-0.49, -0.25, 0, 0.25, 0.49]) {
           for (const distanceFraction of [0.001, 0.25, 0.5, 0.75, 0.999]) {
@@ -249,7 +254,7 @@ describe('authored level campaign', () => {
     const alpineTransfers = alpineGroups.slice(1).map((group, index) => (
       routeTransferDistance(alpineGroups[index], group)
     ));
-    expect(Math.max(...alpineTransfers)).toBeGreaterThan(100);
+    expect(Math.max(...alpineTransfers)).toBeGreaterThan(90);
     const transferTo = (idFragment: string) => {
       const targetIndex = alpineGroups.findIndex((group) => (
         group.ramps.some((ramp) => ramp.id.includes(idFragment))
@@ -259,15 +264,16 @@ describe('authored level campaign', () => {
         alpineGroups[targetIndex],
       );
     };
-    // Authored 76- and 110-unit approach gaps remain long even after this
-    // edge-to-edge measurement subtracts the compact catch widths.
+    // The signature still asks for a major transfer, while the former
+    // 110-unit closing gap is intentionally compressed into a readable catch.
     expect(transferTo('signature-wedge')).toBeGreaterThan(60);
-    expect(transferTo('map01-s3-e')).toBeGreaterThan(100);
+    expect(transferTo('map01-s3-e')).toBeGreaterThan(60);
+    expect(transferTo('map01-s3-e')).toBeLessThan(75);
   });
 
   it('keeps every authored catch wide and introduces dual wedges in later routes', () => {
     for (let index = 0; index < trainingLevels.length; index += 1) {
-      expect(banks(index).every((ramp) => effectiveWidth(ramp) >= 34)).toBe(true);
+      expect(banks(index).every((ramp) => effectiveWidth(ramp) >= 32)).toBe(true);
     }
     expect(trainingLevels.slice(0, 2).every((level) => (
       route(level).every((group) => group.ramps.length === 1)
@@ -283,7 +289,7 @@ describe('authored level campaign', () => {
       expect(route(fullMap)
         .map((group) => primaryRouteRamp(group))
         .filter((ramp) => ramp.kind === 'bank')
-        .every((ramp) => effectiveWidth(ramp) >= 36)).toBe(true);
+        .every((ramp) => effectiveWidth(ramp) >= 34)).toBe(true);
     }
   });
 });

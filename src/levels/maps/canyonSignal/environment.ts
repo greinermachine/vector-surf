@@ -10,7 +10,7 @@ import {
 import type { SurfLevel } from '../../../game/types';
 
 export type CanyonGeometry = 'rock' | 'slab' | 'mesa';
-export type CanyonMaterial = 'sandstone' | 'sunlit' | 'dark' | 'deep' | 'cyan';
+export type CanyonMaterial = 'sandstone' | 'sunlit' | 'cave' | 'cyan';
 
 export type CanyonTransform = {
   position: readonly [number, number, number];
@@ -41,7 +41,10 @@ export function buildCanyonEnvironment(level: SurfLevel) {
     const routeWidth = ramp.dual?.totalWidth ?? ramp.width;
     const insideCave = index >= caveStart && index <= caveEnd;
 
-    for (const fraction of insideCave ? [0.18, 0.62] : [0.16, 0.5, 0.84]) {
+    // Two large silhouettes per side read as a continuous canyon at speed.
+    // The former three-piece exterior cadence added fill-rate and vertices in
+    // the longest sight lines without changing the route silhouette.
+    for (const fraction of insideCave ? [0.18, 0.62] : [0.2, 0.74]) {
       for (const side of [-1, 1]) {
         const phase = index * 1.73 + fraction * 5.1 + side * 0.9;
         const offset = routeWidth / 2 + (insideCave ? 62 : 70) + (index % 3) * 11;
@@ -56,14 +59,14 @@ export function buildCanyonEnvironment(level: SurfLevel) {
           ],
           [Math.sin(phase) * 0.11, phase * 0.17, Math.cos(phase) * 0.1],
           'rock',
-          insideCave ? (index % 2 === 0 ? 'deep' : 'dark') : (index % 3 === 0 ? 'sunlit' : 'sandstone'),
+          insideCave ? 'cave' : (index % 3 === 0 ? 'sunlit' : 'sandstone'),
         ));
       }
     }
 
     if (insideCave) {
       // Broad ceilings and far-apart posts create a cavern, not a tunnel.
-      for (const fraction of [0.12, 0.52, 0.9]) {
+      for (const fraction of [0.24, 0.76]) {
         const center = rampSurfacePoint(ramp, 0, basis.length * fraction);
         const yaw = rampHeading(ramp);
         const openingWidth = routeWidth + 112 + (index % 2) * 18;
@@ -72,7 +75,7 @@ export function buildCanyonEnvironment(level: SurfLevel) {
           [openingWidth, 12, 18],
           [0.05 * Math.sin(index), yaw, 0.04 * Math.cos(index)],
           'slab',
-          index % 2 === 0 ? 'deep' : 'dark',
+          'cave',
         ));
       }
     }
@@ -90,7 +93,7 @@ export function buildCanyonEnvironment(level: SurfLevel) {
       [26, 94, 24],
       [0, mouthYaw + side * 0.08, side * 0.04],
       'rock',
-      'deep',
+      'cave',
     ));
     pieces.push(piece(
       [
@@ -109,7 +112,7 @@ export function buildCanyonEnvironment(level: SurfLevel) {
     [176, 22, 25],
     [0, mouthYaw, 0],
     'rock',
-    'deep',
+    'cave',
   ));
 
   // The exit is a bright stone arch visible from the darker approach.
@@ -136,13 +139,23 @@ export function buildCanyonEnvironment(level: SurfLevel) {
   ));
 
   // Start and finish plateaus are the only large horizontal terrain slabs.
-  for (const [index, material] of [[0, 'sunlit'], [route.length - 1, 'sandstone']] as const) {
+  // Their route-facing edges stop at the playable deck boundary: extending a
+  // box equally in both directions embeds the neighboring sloped ramp in it.
+  for (const [index, material, rearOverhang, frontOverhang] of [
+    [0, 'sunlit', 10, 0],
+    [route.length - 1, 'sandstone', 0, 12],
+  ] as const) {
     const ramp = route[index];
     const basis = getRampBasis(ramp);
-    const center = rampSurfacePoint(ramp, 0, basis.length * 0.5);
+    const supportDepth = basis.length + rearOverhang + frontOverhang;
+    const supportCenterDistance = (
+      basis.length + frontOverhang - rearOverhang
+    ) * 0.5;
+    const center = rampSurfacePoint(ramp, 0, supportCenterDistance);
     pieces.push(piece(
-      [center.x, center.y - 6, center.z],
-      [132, 12, basis.length + 44],
+      // Keep the decorative plateau top a full unit below the playable plane.
+      [center.x, center.y - 7, center.z],
+      [132, 12, supportDepth],
       [0, rampHeading(ramp), 0],
       'slab',
       material,
@@ -168,7 +181,6 @@ export function buildCanyonEnvironment(level: SurfLevel) {
     [maximumX + 340, minimumZ + 120, 1.35],
     [minimumX - 280, maximumZ + 260, 1.25],
     [maximumX + 300, maximumZ + 310, 1.5],
-    [(minimumX + maximumX) / 2, maximumZ + 390, 1.7],
   ] as const;
   distantMesas.forEach(([x, z, size], index) => {
     pieces.push(piece(

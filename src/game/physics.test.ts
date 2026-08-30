@@ -222,7 +222,9 @@ function scriptedRide(levelIndex: number, maximumSeconds = 36) {
       state.contactRampId !== contactBeforeStep &&
       speedBeforeStep > 1
     ) {
-      catchSpeedRatios.push(state.velocity.length() / speedBeforeStep);
+      const catchSpeedRatio = state.velocity.length() / speedBeforeStep;
+      catchSpeedRatios.push(catchSpeedRatio);
+      events.push(`${frame}:catch-ratio-${state.contactRampId}=${catchSpeedRatio.toFixed(3)}`);
     }
     if (state.contactState === 'air') {
       airFrames += 1;
@@ -664,6 +666,44 @@ describe('standalone surf physics', () => {
       expect(restored.resets).toBe(1);
     },
   );
+
+  it('does not reset Canyon during the opening drop toward its first catch', () => {
+    const level = SURF_LEVELS.find((candidate) => candidate.id === 'canyon-signal')!;
+    const overlook = level.ramps.find((ramp) => ramp.id === 'map03-overlook')!;
+    const basis = getRampBasis(overlook);
+    const state = createSurfPlayer(level);
+    state.position.copy(rampSurfacePoint(overlook, 0, basis.length + 8));
+    state.position.y += SURF_TUNING.playerHeight - 26;
+    state.velocity
+      .set(basis.forwardX, basis.forwardSlope, basis.forwardZ)
+      .normalize()
+      .multiplyScalar(32);
+    state.yaw = rampHeading(overlook);
+    state.contactState = 'air';
+    state.contactRampId = undefined;
+    state.contactNormal.set(0, 0, 0);
+    state.contactGraceRemaining = 0;
+    state.surfingStarted = true;
+
+    const afterLaunch = stepSurfPlayer(state, input(), level, SURF_TUNING.fixedStep);
+    const withDefaultThreshold = stepSurfPlayer(
+      state,
+      input(),
+      {
+        ...level,
+        world: {
+          ...level.world!,
+          resetDropDistance: SURF_TUNING.resetDropDistance,
+        },
+      },
+      SURF_TUNING.fixedStep,
+    );
+
+    expect(level.world?.resetDropDistance).toBe(32);
+    expect(afterLaunch.resets).toBe(0);
+    expect(afterLaunch.contactState).toBe('air');
+    expect(withDefaultThreshold.resets).toBe(1);
+  });
 
   it('applies a mouse delta once even across multiple fixed substeps', () => {
     const level = getSurfLevel(0);

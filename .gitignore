@@ -5,4 +5,4 @@ coverage/
 .vercel/
 .env*.local
 docs/*
-!docs/surf-map-expansion.md
+

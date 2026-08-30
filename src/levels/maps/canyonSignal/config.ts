@@ -46,6 +46,7 @@ const overlook = mapBank(
 const canyonWedge = followingMapBank(overlook, {
   id: 'map03-canyon-wedge', heading: 0.08, length: 90, profile: 'wide-catch',
   drop: 19, bankDirection: -1, gap: 58, entryDrop: 43,
+  width: 52, bankRadians: 0.42,
   color: slate, edgeColor: aqua,
 });
 const canyonWedgeDual = dualizeRamp(canyonWedge, 'map03-canyon-dual');
@@ -74,7 +75,7 @@ const caveMouth = followingMapBank(archLine, {
 const caveMouthDual = dualizeRamp(caveMouth, 'map03-cave-mouth-dual');
 const undergroundLeft = followingMapBank(caveMouth, {
   id: 'map03-underground-left', heading: 1.35, length: 88, profile: 'wide-catch',
-  drop: 18, bankDirection: 1, gap: 42, entryDrop: 13,
+  drop: 18, bankDirection: 1, gap: 42, entryDrop: 14,
   color: '#53686b', edgeColor: aqua,
 });
 const undergroundWedge = followingMapBank(undergroundLeft, {
@@ -91,7 +92,7 @@ const cavernDrop = followingMapBank(undergroundWedge, {
 });
 const cavernSweep = followingMapBank(cavernDrop, {
   id: 'map03-cavern-sweep', heading: 2.18, length: 94, profile: 'large',
-  drop: 19, bankDirection: -1, gap: 64, entryDrop: 24,
+  drop: 19, bankDirection: -1, gap: 64, entryDrop: 24, bankRadians: 0.43,
   color: cave, edgeColor: cyan,
 });
 
@@ -103,7 +104,7 @@ const daylightApproach = followingMapBank(cavernSweep, {
 });
 const daylightCatch = followingMapBank(daylightApproach, {
   id: 'map03-daylight-catch', heading: 2.75, length: 96, profile: 'wide-catch',
-  drop: 19, bankDirection: -1, gap: 96, entryDrop: 42,
+  drop: 19, bankDirection: -1, gap: 72, entryDrop: 32, width: 64,
   color: slate, edgeColor: cyan,
 });
 
@@ -116,23 +117,23 @@ const basinWedge = followingMapBank(daylightCatch, {
 const basinWedgeDual = dualizeRamp(basinWedge, 'map03-basin-dual');
 const canyonFast = followingMapBank(basinWedge, {
   id: 'map03-canyon-fast', heading: -2.95, length: 94, profile: 'large',
-  drop: 20, bankDirection: -1, gap: 60, entryDrop: 24,
+  drop: 20, bankDirection: -1, gap: 42, entryDrop: 22, approachLateral: -30,
   color: slate, edgeColor: cyan,
 });
 const canyonSignature = followingMapBank(canyonFast, {
   id: 'map03-canyon-signature', heading: -2.67, length: 100, profile: 'signature',
   drop: 21, bankDirection: 1, gap: 45, entryDrop: -2,
-  approachLateral: -38,
+  approachLateral: -4,
   color: pale, edgeColor: aqua,
 });
 const canyonSignatureDual = dualizeRamp(canyonSignature, 'map03-canyon-signature-dual');
 const finalBasin = followingMapBank(canyonSignature, {
-  id: 'map03-final-basin', heading: -2.38, length: 98, profile: 'wide-catch',
-  drop: 18, bankDirection: -1, gap: 68, entryDrop: 20,
+  id: 'map03-final-basin', heading: -2.38, length: 96, profile: 'wide-catch',
+  drop: 18, bankDirection: -1, gap: 68, entryDrop: 27,
   color: slate, edgeColor: cyan,
 });
 const landing = followingMapLanding(finalBasin, {
-  id: 'map03-finish-runout', heading: -2.38, length: 110, profile: 'wide-catch',
+  id: 'map03-finish-runout', heading: -2.38, length: 106, profile: 'wide-catch',
   gap: 52, entryDrop: 0, approachLateral: -40, previousExitFraction: -0.3,
   color: '#80624c', edgeColor: aqua,
 });
@@ -193,5 +194,8 @@ export const CANYON_SIGNAL_MAP: SurfLevel = {
     fogNear: 240,
     fogFar: 1_650,
     cameraFar: 2_050,
+    // Canyon deliberately drops farther between faces than the other maps.
+    // Give a valid launch time to reach its next catch before declaring a fall.
+    resetDropDistance: 32,
   },
 };

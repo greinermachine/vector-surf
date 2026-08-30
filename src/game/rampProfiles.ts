@@ -11,44 +11,44 @@ export type RampScaleProfile = {
 
 export const SURF_RAMP_PROFILES = {
   'small-launch': {
-    width: 18,
+    width: 17,
     bankRadians: 0,
-    shellThickness: 0.6,
+    shellThickness: 0.44,
   },
   beginner: {
-    width: 34,
-    bankRadians: 0.33,
-    shellThickness: 0.82,
+    width: 32,
+    bankRadians: 0.35,
+    shellThickness: 0.66,
   },
   normal: {
-    width: 36,
-    bankRadians: 0.37,
-    shellThickness: 0.9,
+    width: 34,
+    bankRadians: 0.41,
+    shellThickness: 0.72,
   },
   large: {
-    width: 42,
-    bankRadians: 0.39,
-    shellThickness: 1,
+    width: 39,
+    bankRadians: 0.44,
+    shellThickness: 0.78,
   },
   'wide-catch': {
-    width: 64,
-    bankRadians: 0.32,
-    shellThickness: 1,
+    width: 60,
+    bankRadians: 0.37,
+    shellThickness: 0.78,
   },
   signature: {
-    width: 44,
-    bankRadians: 0.42,
-    shellThickness: 1.1,
+    width: 40,
+    bankRadians: 0.49,
+    shellThickness: 0.84,
   },
   landing: {
-    width: 48,
+    width: 46,
     bankRadians: 0,
-    shellThickness: 0.7,
+    shellThickness: 0.54,
   },
 } as const satisfies Record<RampScaleProfileName, RampScaleProfile>;
 
 export const DEFAULT_DUAL_SURF_RAMP = {
-  totalWidth: 68,
+  totalWidth: 64,
   bankRadians: SURF_RAMP_PROFILES.normal.bankRadians,
 } as const;
 

@@ -46,7 +46,7 @@ const atriumWedge = mapBank(
 const atriumWedgeDual = dualizeRamp(atriumWedge, 'map02-atrium-dual');
 const galleryLeft = followingMapBank(atriumWedge, {
   id: 'map02-gallery-left', heading: 0.04, length: 84, profile: 'wide-catch',
-  drop: 17, bankDirection: -1, gap: 34, entryDrop: 13,
+  drop: 17, bankDirection: -1, gap: 34, entryDrop: 15,
   color: concreteShade, edgeColor: blue,
 });
 const galleryRight = followingMapBank(galleryLeft, {
@@ -69,13 +69,13 @@ const shaftEntry = followingMapBank(galleryWedge, {
 });
 const shaftDrop = followingMapBank(shaftEntry, {
   id: 'map02-shaft-drop', heading: 0.66, length: 86, profile: 'wide-catch',
-  drop: 18, bankDirection: -1, gap: 70, entryDrop: 38,
+  drop: 18, bankDirection: -1, gap: 70, entryDrop: 45,
   approachLateral: -42,
   color: concreteShade, edgeColor: orange,
 });
 const towerWedge = followingMapBank(shaftDrop, {
   id: 'map02-tower-wedge', heading: 0.88, length: 88, profile: 'large',
-  drop: 18, bankDirection: 1, gap: 46, entryDrop: 15,
+  drop: 18, bankDirection: 1, gap: 46, entryDrop: 13,
   color: concreteDark, edgeColor: blue,
 });
 const towerWedgeDual = dualizeRamp(towerWedge, 'map02-tower-dual');
@@ -88,12 +88,12 @@ const towerExit = followingMapBank(towerWedge, {
 // The long orange line launches across the map's open architectural void.
 const voidApproach = followingMapBank(towerExit, {
   id: 'map02-void-approach', heading: 1.52, length: 94, profile: 'signature',
-  drop: 20, bankDirection: 1, gap: 48, entryDrop: 17,
+  drop: 20, bankDirection: 1, gap: 48, entryDrop: 16,
   color: concreteShade, edgeColor: orange,
 });
 const voidCatch = followingMapBank(voidApproach, {
   id: 'map02-void-catch', heading: 1.76, length: 92, profile: 'wide-catch',
-  drop: 18, bankDirection: -1, gap: 65, entryDrop: 44,
+  drop: 18, bankDirection: -1, gap: 65, entryDrop: 38,
   approachLateral: -40,
   color: concrete, edgeColor: blue,
 });
@@ -101,13 +101,14 @@ const voidCatch = followingMapBank(voidApproach, {
 // Courtyard: the line opens up and finishes with broad, fast direction changes.
 const courtyardWedge = followingMapBank(voidCatch, {
   id: 'map02-courtyard-wedge', heading: 2.02, length: 88, profile: 'large',
-  drop: 18, bankDirection: 1, gap: 48, entryDrop: 20,
+  drop: 18, bankDirection: 1, gap: 72, entryDrop: 1, approachLateral: -36,
   color: concreteDark, edgeColor: white,
 });
 const courtyardWedgeDual = dualizeRamp(courtyardWedge, 'map02-courtyard-dual');
 const finalLeft = followingMapBank(courtyardWedge, {
   id: 'map02-final-left', heading: 2.28, length: 86, profile: 'normal',
-  drop: 17, bankDirection: -1, gap: 46, entryDrop: 10,
+  drop: 17, bankDirection: -1, gap: 40, entryDrop: 26,
+  approachLateral: -10, width: 38,
   color: concreteShade, edgeColor: orange,
 });
 const finalWedge = followingMapBank(finalLeft, {
@@ -118,18 +119,18 @@ const finalWedge = followingMapBank(finalLeft, {
 const finalWedgeDual = dualizeRamp(finalWedge, 'map02-final-dual');
 const finalRight = followingMapBank(finalWedge, {
   id: 'map02-final-right', heading: 2.78, length: 88, profile: 'normal',
-  drop: 17, bankDirection: -1, gap: 40, entryDrop: 50,
+  drop: 17, bankDirection: -1, gap: 40, entryDrop: 26,
   approachLateral: -80,
   color: concreteDark, edgeColor: orange,
 });
 const finalSweep = followingMapBank(finalRight, {
-  id: 'map02-final-sweep', heading: 3.02, length: 94, profile: 'wide-catch',
-  drop: 16, bankDirection: 1, gap: 62, entryDrop: 25,
+  id: 'map02-final-sweep', heading: 3.02, length: 92, profile: 'wide-catch',
+  drop: 16, bankDirection: 1, gap: 53, entryDrop: 7, approachLateral: -22,
   color: concrete, edgeColor: blue,
 });
 const landing = followingMapLanding(finalSweep, {
-  id: 'map02-finish-runout', heading: 3.02, length: 104, profile: 'wide-catch',
-  gap: 48, entryDrop: 13, color: '#929b9a', edgeColor: white,
+  id: 'map02-finish-runout', heading: 3.02, length: 100, profile: 'wide-catch',
+  gap: 48, entryDrop: 29, color: '#929b9a', edgeColor: white,
 });
 
 export const PARALLAX_MAP: SurfLevel = {

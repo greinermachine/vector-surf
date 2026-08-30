@@ -131,13 +131,23 @@ export function buildParallaxEnvironment(level: SurfLevel) {
   }
 
   // Start and finish plinths make the authored complex feel physically rooted.
-  for (const [index, material] of [[0, 'concrete'], [route.length - 1, 'shadow']] as const) {
+  // Keep the route-facing edge flush with its flat deck so the support cannot
+  // extend into the adjacent sloped ramp.
+  for (const [index, material, rearOverhang, frontOverhang] of [
+    [0, 'concrete', 8, 0],
+    [route.length - 1, 'shadow', 0, 10],
+  ] as const) {
     const ramp = route[index];
     const basis = getRampBasis(ramp);
-    const center = rampSurfacePoint(ramp, 0, basis.length * 0.5);
+    const supportDepth = basis.length + rearOverhang + frontOverhang;
+    const supportCenterDistance = (
+      basis.length + frontOverhang - rearOverhang
+    ) * 0.5;
+    const center = rampSurfacePoint(ramp, 0, supportCenterDistance);
     pieces.push(piece(
-      [center.x, center.y - 3, center.z],
-      [112, 5.5, basis.length + 34],
+      // Leave visible depth beneath the authored collision plane.
+      [center.x, center.y - 4.25, center.z],
+      [112, 5.5, supportDepth],
       rampHeading(ramp),
       material,
     ));

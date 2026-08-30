@@ -57,6 +57,7 @@ export type SurfWorldSettings = {
   fogFar: number;
   cameraFar: number;
   waterY?: number;
+  resetDropDistance?: number;
 };
 
 export type SurfLevel = {

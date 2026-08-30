@@ -24,6 +24,7 @@ export function mapSurface(
   bankDirection: -1 | 1,
   color: string,
   edgeColor: string,
+  overrides: { width?: number; bankRadians?: number } = {},
 ): RampDefinition {
   return createSurfRamp({
     id,
@@ -34,6 +35,7 @@ export function mapSurface(
     startY,
     endY,
     bankDirection,
+    ...overrides,
     color,
     edgeColor,
   });
@@ -49,6 +51,7 @@ export function mapBank(
   bankDirection: -1 | 1,
   color: string,
   edgeColor: string,
+  overrides: { width?: number; bankRadians?: number } = {},
 ) {
   return mapSurface(
     id,
@@ -61,6 +64,7 @@ export function mapBank(
     bankDirection,
     color,
     edgeColor,
+    overrides,
   );
 }
 
@@ -78,6 +82,8 @@ export type FollowingBankOptions = {
   entryFraction?: number;
   approachLateral?: number;
   previousExitFraction?: number;
+  width?: number;
+  bankRadians?: number;
 };
 
 export function followingMapBank(
@@ -85,8 +91,8 @@ export function followingMapBank(
   options: FollowingBankOptions,
 ) {
   const profile = SURF_RAMP_PROFILES[options.profile];
-  const width = profile.width;
-  const bankRadians = profile.bankRadians * options.bankDirection;
+  const width = options.width ?? profile.width;
+  const bankRadians = (options.bankRadians ?? profile.bankRadians) * options.bankDirection;
   const previousBasis = getRampBasis(previous);
   const previousExit = rampSurfacePoint(
     previous,
@@ -132,6 +138,7 @@ export function followingMapBank(
     options.bankDirection,
     options.color,
     options.edgeColor,
+    { width, bankRadians },
   );
 }
 

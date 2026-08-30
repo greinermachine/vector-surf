@@ -86,7 +86,16 @@ function RampMesh({
       </lineSegments>
       {showCenterStrip && (
         <mesh geometry={strip}>
-          <meshBasicMaterial color={ramp.edgeColor} transparent opacity={0.9} depthWrite={false} side={DoubleSide} />
+          <meshBasicMaterial
+            color={ramp.edgeColor}
+            transparent
+            opacity={0.9}
+            depthWrite={false}
+            polygonOffset
+            polygonOffsetFactor={-2}
+            polygonOffsetUnits={-2}
+            side={DoubleSide}
+          />
         </mesh>
       )}
       {debug && (
@@ -178,6 +187,9 @@ function DualSurfRampMesh({
           transparent
           opacity={0.94}
           depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-2}
+          polygonOffsetUnits={-2}
           side={DoubleSide}
         />
       </mesh>

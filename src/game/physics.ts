@@ -767,11 +767,13 @@ function stepSurfPlayerInPlace(
   }
 
   const referenceHeight = routeReferenceHeight(level, state.position);
+  const resetDropDistance =
+    level.world?.resetDropDistance ?? SURF_TUNING.resetDropDistance;
   if (
     !isFiniteVector(state.position) ||
     !isFiniteVector(state.velocity) ||
     state.position.y < SURF_TUNING.resetHeight ||
-    state.position.y < referenceHeight - SURF_TUNING.resetDropDistance
+    state.position.y < referenceHeight - resetDropDistance
   ) {
     resetPlayerInPlace(state, level);
   }

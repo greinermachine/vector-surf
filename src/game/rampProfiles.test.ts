@@ -9,8 +9,8 @@ import {
 
 describe('global surf ramp scale profiles', () => {
   it('makes normal ramps compact while retaining distinct large and catch scales', () => {
-    expect(SURF_RAMP_PROFILES.normal.width).toBe(36);
-    expect(SURF_RAMP_PROFILES.normal.bankRadians).toBe(0.37);
+    expect(SURF_RAMP_PROFILES.normal.width).toBe(34);
+    expect(SURF_RAMP_PROFILES.normal.bankRadians).toBe(0.41);
     expect(SURF_RAMP_PROFILES['small-launch'].width).toBeLessThan(
       SURF_RAMP_PROFILES.normal.width,
     );
@@ -23,9 +23,31 @@ describe('global surf ramp scale profiles', () => {
     expect(SURF_RAMP_PROFILES.signature.bankRadians).toBeGreaterThan(
       SURF_RAMP_PROFILES.normal.bankRadians,
     );
+    expect(SURF_RAMP_PROFILES['wide-catch'].bankRadians).toBeLessThan(
+      SURF_RAMP_PROFILES.normal.bankRadians,
+    );
     expect(Math.max(...Object.values(SURF_RAMP_PROFILES).map(
       (profile) => profile.shellThickness,
-    ))).toBeLessThanOrEqual(1.1);
+    ))).toBeLessThanOrEqual(0.84);
+  });
+
+  it('increases usable vertical range while trimming each surf footprint', () => {
+    const previous = {
+      beginner: { width: 34, angle: 0.33 },
+      normal: { width: 36, angle: 0.37 },
+      large: { width: 42, angle: 0.39 },
+      'wide-catch': { width: 64, angle: 0.32 },
+      signature: { width: 44, angle: 0.42 },
+    } as const;
+    for (const name of Object.keys(previous) as (keyof typeof previous)[]) {
+      const profile = SURF_RAMP_PROFILES[name];
+      const old = previous[name];
+      expect(profile.width).toBeLessThan(old.width);
+      expect(profile.bankRadians).toBeGreaterThan(old.angle);
+      expect(Math.tan(profile.bankRadians) * profile.width).toBeGreaterThan(
+        Math.tan(old.angle) * old.width,
+      );
+    }
   });
 
   it('creates a sensible normal bank when no dimensions are overridden', () => {

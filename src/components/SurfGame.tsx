@@ -208,7 +208,9 @@ export function SurfGame({
         <ambientLight intensity={0.38} />
         <hemisphereLight args={[level.palette.accentHot, level.palette.void, 0.52]} />
         <directionalLight position={[34, 48, -22]} intensity={1.65} color="#f5fff5" />
-        <pointLight position={[0, 10, 32]} intensity={22} distance={90} color={level.palette.accent} />
+        {level.world?.kind !== 'canyon-signal-map' && (
+          <pointLight position={[0, 10, 32]} intensity={22} distance={90} color={level.palette.accent} />
+        )}
         <CourseWorld
           level={level}
           debug={debug}

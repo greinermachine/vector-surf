@@ -52,12 +52,22 @@ export type LevelPalette = {
 };
 
 export type SurfWorldSettings = {
-  kind: 'alpine-map' | 'parallax-map' | 'canyon-signal-map';
+  kind:
+    | 'alpine-map'
+    | 'parallax-map'
+    | 'canyon-signal-map'
+    | 'dynamo-rise-map'
+    | 'switchyard-map';
   fogNear: number;
   fogFar: number;
   cameraFar: number;
   waterY?: number;
   resetDropDistance?: number;
+};
+
+export type SurfRouteLink = {
+  from: string;
+  to: string;
 };
 
 export type SurfLevel = {
@@ -80,6 +90,11 @@ export type SurfLevel = {
     speed: number;
   };
   ramps: readonly RampDefinition[];
+  /**
+   * Optional authored topology for maps whose valid route is not the order of
+   * `ramps`. Link ids refer to ordinary ramp ids or shared dual-ramp ids.
+   */
+  routeLinks?: readonly SurfRouteLink[];
   goal: {
     rampId: string;
     position: Vector3;

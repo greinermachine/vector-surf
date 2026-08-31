@@ -7,6 +7,7 @@ import {
   Object3D,
   OctahedronGeometry,
   type BufferGeometry,
+  type MeshStandardMaterialParameters,
 } from 'three';
 import type { SurfLevel } from '../../../game/types';
 import {
@@ -36,35 +37,35 @@ function useInstanceTransforms(
   }, [ref, transforms]);
 }
 
-const MATERIALS: Record<CanyonMaterial, {
-  color: string;
-  emissive: string;
-  emissiveIntensity: number;
-  roughness: number;
-  metalness: number;
-}> = {
+const MATERIALS: Record<CanyonMaterial, MeshStandardMaterialParameters> = {
   sandstone: {
-    color: '#8e5338', emissive: '#6b3628', emissiveIntensity: 0.055,
+    color: '#91563b', emissive: '#743d2b', emissiveIntensity: 0.085,
     roughness: 0.98, metalness: 0,
   },
   sunlit: {
-    color: '#bd7448', emissive: '#9e5438', emissiveIntensity: 0.09,
+    color: '#c0794d', emissive: '#a65a3b', emissiveIntensity: 0.12,
     roughness: 0.96, metalness: 0,
   },
   cave: {
-    color: '#2f3031', emissive: '#1c2528', emissiveIntensity: 0.04,
+    color: '#383433', emissive: '#263033', emissiveIntensity: 0.1,
     roughness: 1, metalness: 0,
   },
   cyan: {
     color: '#55ecff', emissive: '#35dff4', emissiveIntensity: 0.85,
     roughness: 0.46, metalness: 0.12,
   },
+  sunbeam: {
+    color: '#ffd79a', emissive: '#ffbf72', emissiveIntensity: 0.72,
+    roughness: 0.82, metalness: 0, transparent: true, opacity: 0.12,
+    depthWrite: false,
+  },
 };
 
 const FIELDS: readonly [CanyonGeometry, CanyonMaterial][] = [
   ['rock', 'sandstone'], ['rock', 'sunlit'], ['rock', 'cave'],
   ['slab', 'sunlit'], ['slab', 'sandstone'], ['slab', 'cave'],
-  ['slab', 'cyan'], ['mesa', 'sandstone'], ['mesa', 'sunlit'],
+  ['slab', 'cyan'], ['slab', 'sunbeam'],
+  ['mesa', 'sandstone'], ['mesa', 'sunlit'],
 ];
 
 function CanyonField({
@@ -107,6 +108,7 @@ export function CanyonSignalMap({ level }: { level: SurfLevel }) {
     sunlit: new MeshStandardMaterial({ ...MATERIALS.sunlit, flatShading: true }),
     cave: new MeshStandardMaterial({ ...MATERIALS.cave, flatShading: true }),
     cyan: new MeshStandardMaterial({ ...MATERIALS.cyan, flatShading: true }),
+    sunbeam: new MeshStandardMaterial(MATERIALS.sunbeam),
   }), []);
   useEffect(() => () => {
     Object.values(geometries).forEach((geometry) => geometry.dispose());

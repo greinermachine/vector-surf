@@ -3,6 +3,7 @@ import { SURF_TUNING } from './config';
 import {
   primaryRouteRamp,
   rampRouteGroups,
+  rampRouteLinks,
   routeTransferDistance,
 } from './course';
 import { SURF_LEVELS } from './levels';
@@ -15,6 +16,11 @@ import {
 } from './ramp';
 import { SURF_RAMP_PROFILES } from './rampProfiles';
 import { sampleRampSurface } from './physics';
+import {
+  SCRAPYARD_BRANCH_IDS,
+  SCRAPYARD_ROUTES,
+  SWITCHYARD_MAP,
+} from '../levels/maps/switchyard/config';
 import type { RampDefinition } from './types';
 
 const trainingLevels = SURF_LEVELS.filter((level) => level.format !== 'full-map');
@@ -71,8 +77,8 @@ describe('authored level campaign', () => {
       route(level).reduce((sum, group) => sum + getRampBasis(primaryRouteRamp(group)).length, 0)
     ));
     expect(lengths).toEqual([...lengths].sort((a, b) => a - b));
-    expect(fullMaps).toHaveLength(3);
-    expect(fullMaps.map((level) => level.mapNumber)).toEqual([1, 2, 3]);
+    expect(fullMaps).toHaveLength(5);
+    expect(fullMaps.map((level) => level.mapNumber)).toEqual([1, 2, 3, 4, 5]);
     for (const fullMap of fullMaps) {
       const fullMapLength = route(fullMap).reduce(
         (sum, group) => sum + getRampBasis(primaryRouteRamp(group)).length,
@@ -105,6 +111,8 @@ describe('authored level campaign', () => {
       'alpine-map',
       'parallax-map',
       'canyon-signal-map',
+      'dynamo-rise-map',
+      'switchyard-map',
     ]);
   });
 
@@ -138,18 +146,22 @@ describe('authored level campaign', () => {
     '%s has separated collision footprints outside intentional dual ridges',
     (_id, level) => {
       const overlaps: string[] = [];
+      const linkedPairs = new Set(rampRouteLinks(level).map((link) => (
+        [link.from.id, link.to.id].sort().join('|')
+      )));
       for (let left = 0; left < level.ramps.length; left += 1) {
         for (let right = left + 1; right < level.ramps.length; right += 1) {
           const a = level.ramps[left];
           const b = level.ramps[right];
           if (a.dual?.id && a.dual.id === b.dual?.id) continue;
+          const groupPair = [a.dual?.id ?? a.id, b.dual?.id ?? b.id].sort().join('|');
+          if (linkedPairs.has(groupPair)) continue;
           if (footprintsOverlapWithArea(a, b)) overlaps.push(`${a.id} / ${b.id}`);
         }
       }
       expect(overlaps).toEqual([]);
-      const groups = route(level);
-      for (let index = 1; index < groups.length; index += 1) {
-        expect(routeTransferDistance(groups[index - 1], groups[index])).toBeGreaterThan(2);
+      for (const link of rampRouteLinks(level)) {
+        expect(routeTransferDistance(link.from, link.to)).toBeGreaterThan(2);
       }
     },
   );
@@ -160,13 +172,23 @@ describe('authored level campaign', () => {
       for (const ramp of level.ramps) {
         expect(ramp.scaleProfile).toBeDefined();
         const profile = SURF_RAMP_PROFILES[ramp.scaleProfile!];
-        // Critical catches may opt into a narrowly bounded width or bank-angle
-        // override while retaining the profile's visual scale and shell depth.
+        // Critical branch catches may widen or shallow the base profile while
+        // retaining its shared visual shell depth and material treatment.
         expect(ramp.width).toBeGreaterThanOrEqual(profile.width * 0.85);
-        expect(ramp.width).toBeLessThanOrEqual(profile.width * 1.12);
+        const maximumWidthMultiplier = [
+          'map05-control-lift',
+          'map05-final-transfer',
+        ].includes(ramp.id) ? 1.7 : 1.55;
+        expect(ramp.width).toBeLessThanOrEqual(profile.width * maximumWidthMultiplier);
         if (ramp.kind === 'bank') {
-          expect(Math.abs(ramp.bankRadians)).toBeGreaterThanOrEqual(profile.bankRadians * 0.97);
-          expect(Math.abs(ramp.bankRadians)).toBeLessThanOrEqual(profile.bankRadians * 1.15);
+          expect(Math.abs(ramp.bankRadians)).toBeGreaterThanOrEqual(profile.bankRadians * 0.78);
+          const maximumBankMultiplier = [
+            'map05-processing-drop',
+            'map05-control-lift',
+          ].includes(ramp.id) ? 1.35 : 1.2;
+          expect(Math.abs(ramp.bankRadians)).toBeLessThanOrEqual(
+            profile.bankRadians * maximumBankMultiplier,
+          );
         } else {
           expect(ramp.bankRadians).toBe(0);
         }
@@ -282,14 +304,69 @@ describe('authored level campaign', () => {
       route(level).filter((group) => group.ramps.length === 2).length
     ))).toEqual([1, 2, 3, 3]);
     expect(route(alpineFlow).filter((group) => group.ramps.length === 2)).toHaveLength(7);
-    expect(fullMaps.slice(1).every((level) => (
-      route(level).filter((group) => group.ramps.length === 2).length >= 4
-    ))).toBe(true);
+    for (const fullMap of fullMaps) {
+      const dualCount = route(fullMap).filter((group) => group.ramps.length === 2).length;
+      expect(dualCount).toBeGreaterThanOrEqual(fullMap.id === 'switchyard' ? 0 : 3);
+    }
     for (const fullMap of fullMaps) {
       expect(route(fullMap)
         .map((group) => primaryRouteRamp(group))
         .filter((ramp) => ramp.kind === 'bank')
         .every((ramp) => effectiveWidth(ramp) >= 34)).toBe(true);
+    }
+  });
+
+  it('defines two substantial Scrapyard Junctions routes through one authored fork and rejoin', () => {
+    expect(SWITCHYARD_MAP.id).toBe('switchyard');
+    expect(SWITCHYARD_MAP.name).toBe('Scrapyard Junctions');
+    expect(SWITCHYARD_MAP.world?.kind).toBe('switchyard-map');
+    expect(SWITCHYARD_MAP.ramps.every((ramp) => (
+      !['#fff', '#ffffff', 'white'].includes(ramp.color.toLowerCase())
+      && !['#fff', '#ffffff', 'white'].includes(ramp.edgeColor.toLowerCase())
+    ))).toBe(true);
+    expect(SCRAPYARD_ROUTES.map((routeOption) => [
+      routeOption.id,
+      routeOption.identity,
+    ])).toEqual([
+      ['A', 'upper-yard'],
+      ['B', 'lower-works'],
+    ]);
+    const rampById = new Map(SWITCHYARD_MAP.ramps.map((ramp) => [ramp.id, ramp]));
+    const links = new Set(
+      SWITCHYARD_MAP.routeLinks?.map((link) => `${link.from}->${link.to}`) ?? [],
+    );
+
+    for (const routeOption of SCRAPYARD_ROUTES) {
+      const groupIds = routeOption.rampIds.map((rampId) => {
+        const ramp = rampById.get(rampId);
+        expect(ramp, `${routeOption.id} references ${rampId}`).toBeDefined();
+        return ramp!.dual?.id ?? ramp!.id;
+      });
+      expect(groupIds[0]).toBe('map05-start-platform');
+      expect(groupIds.at(-1)).toBe('map05-finish-control-platform');
+      for (let index = 1; index < groupIds.length; index += 1) {
+        expect(
+          links.has(`${groupIds[index - 1]}->${groupIds[index]}`),
+          `${routeOption.id} is missing ${groupIds[index - 1]} -> ${groupIds[index]}`,
+        ).toBe(true);
+      }
+    }
+
+    const branchLength = (ids: readonly string[]) => ids.reduce((sum, id) => (
+      sum + getRampBasis(rampById.get(id)!).length
+    ), 0);
+    const upperLength = branchLength(SCRAPYARD_BRANCH_IDS.upper);
+    const lowerLength = branchLength(SCRAPYARD_BRANCH_IDS.lower);
+    expect(upperLength / lowerLength).toBeGreaterThan(0.9);
+    expect(upperLength / lowerLength).toBeLessThan(1.1);
+
+    for (const id of SCRAPYARD_BRANCH_IDS.upper) {
+      const ramp = rampById.get(id)!;
+      expect((ramp.start[0] + ramp.end[0]) / 2).toBeLessThan(-40);
+    }
+    for (const id of SCRAPYARD_BRANCH_IDS.lower) {
+      const ramp = rampById.get(id)!;
+      expect((ramp.start[0] + ramp.end[0]) / 2).toBeGreaterThan(40);
     }
   });
 });

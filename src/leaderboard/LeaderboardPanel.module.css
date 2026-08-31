@@ -1,0 +1,122 @@
+.panel {
+  width: min(52rem, 100%);
+  margin-top: 2rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: rgb(6 10 9 / 0.82);
+}
+
+.submissionBlock {
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+}
+
+.scoreComparison {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  margin-bottom: 1.25rem;
+  color: rgb(255 255 255 / 0.44);
+  font: 0.6rem/1.5 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.scoreComparison span { display: grid; gap: 0.2rem; }
+.scoreComparison b { color: rgb(255 255 255 / 0.84); font-size: 0.75rem; letter-spacing: 0.02em; }
+
+.form label {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--level-accent, #caff37);
+  font: 700 0.62rem/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.form > div { display: flex; gap: 0.55rem; }
+.form input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.9rem 0.95rem;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 0;
+  outline: none;
+  background: #0b1110;
+  color: white;
+  font: 0.78rem/1 var(--mono);
+}
+.form input:focus { border-color: var(--level-accent, #caff37); }
+.form button,
+.headingRow button,
+.errorState button {
+  border: 1px solid rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 0.06);
+  color: white;
+  cursor: pointer;
+  font: 700 0.62rem/1 var(--mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.form button { padding: 0.9rem 1rem; background: var(--level-accent, #caff37); color: #081008; }
+.form button:disabled { cursor: wait; opacity: 0.62; }
+.form p { margin: 0.75rem 0 0; color: rgb(255 255 255 / 0.66); font: 0.68rem/1.5 var(--mono); }
+
+.headingRow {
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+}
+.headingRow > div { display: grid; gap: 0.3rem; }
+.headingRow span { color: rgb(255 255 255 / 0.38); font: 0.55rem/1 var(--mono); letter-spacing: 0.13em; }
+.headingRow strong { color: var(--level-accent, #caff37); font: 700 0.8rem/1 var(--mono); letter-spacing: 0.08em; }
+.headingRow button,
+.errorState button { padding: 0.65rem 0.75rem; }
+
+.status { min-height: 9rem; display: grid; place-items: center; margin: 0; color: rgb(255 255 255 / 0.48); font: 0.7rem/1 var(--mono); }
+.emptyState,
+.errorState {
+  min-height: 9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 1.5rem;
+  text-align: center;
+}
+.emptyState strong,
+.errorState strong { color: rgb(255 255 255 / 0.86); font: 700 0.76rem/1 var(--mono); letter-spacing: 0.11em; }
+.emptyState span,
+.errorState span { color: rgb(255 255 255 / 0.46); font: 0.68rem/1.4 var(--mono); }
+.errorState button { margin-top: 0.5rem; }
+
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font: 0.72rem/1.2 var(--mono); }
+.table th,
+.table td { padding: 0.86rem 1rem; border-bottom: 1px solid rgb(255 255 255 / 0.07); text-align: left; }
+.table th { color: rgb(255 255 255 / 0.34); font-size: 0.55rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.table th:first-child,
+.table td:first-child { width: 3.5rem; color: rgb(255 255 255 / 0.38); }
+.table th:last-child,
+.table td:last-child { width: 9rem; text-align: right; }
+.table td:nth-child(2) > span { overflow-wrap: anywhere; }
+.table td:nth-child(2) b {
+  margin-left: 0.65rem;
+  padding: 0.16rem 0.28rem;
+  background: var(--level-accent, #caff37);
+  color: #081008;
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+}
+.table tr[data-current-player="true"] td { background: color-mix(in srgb, var(--level-accent, #caff37) 9%, transparent); color: white; }
+.table tbody tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 38rem) {
+  .form > div { flex-direction: column; }
+  .form button { min-height: 2.8rem; }
+  .table th,
+  .table td { padding-inline: 0.7rem; }
+}

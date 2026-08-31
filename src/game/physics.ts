@@ -6,6 +6,7 @@ import {
   isInsideRamp,
   rampCoordinates,
 } from './ramp';
+import { rampShellThickness } from './rampProfiles';
 import type {
   RampDefinition,
   SurfInput,
@@ -429,6 +430,81 @@ function clipVelocityInPlace(velocity: Vector3, normal: Vector3) {
   if (remaining < 0) velocity.addScaledVector(normal, -remaining);
 }
 
+/**
+ * Resolve a continuous hit against the visible lower face of a ramp shell.
+ *
+ * Player ground contact uses the feet (`position.y - playerHeight`), while an
+ * underside hit uses the player's eye/head point (`position.y`). The lower
+ * face is the same analytic plane as the rendered shell, offset vertically by
+ * `rampShellThickness`. Solving the signed clearance over the whole movement
+ * segment prevents a fast below-to-above step from ever becoming a top catch.
+ */
+function resolveRampUndersideCollision(
+  state: SurfPlayerState,
+  level: SurfLevel,
+  previousPosition: Vector3,
+  scratch: SurfSimulationScratch,
+) {
+  const currentX = state.position.x;
+  const currentY = state.position.y;
+  const currentZ = state.position.z;
+  const padding = SURF_TUNING.rampUndersideCollisionPadding;
+  let hitRamp: RampDefinition | undefined;
+  let hitTime = Number.POSITIVE_INFINITY;
+  let hitX = 0;
+  let hitZ = 0;
+
+  for (const ramp of level.ramps) {
+    const thickness = rampShellThickness(ramp);
+    const previousClearance = previousPosition.y - (
+      heightOnRamp(ramp, previousPosition.x, previousPosition.z) - thickness
+    );
+    const currentClearance = currentY - (
+      heightOnRamp(ramp, currentX, currentZ) - thickness
+    );
+    const clearanceTravel = currentClearance - previousClearance;
+
+    // Only an approach from the open space below can hit the underside. The
+    // small outward padding keeps the resolved point from immediately
+    // re-entering the shell because of floating-point noise.
+    if (
+      previousClearance > -padding ||
+      currentClearance < -padding ||
+      clearanceTravel <= 1e-9
+    ) {
+      continue;
+    }
+
+    const time = (-padding - previousClearance) / clearanceTravel;
+    if (time < 0 || time > 1 || time >= hitTime) continue;
+    const x = previousPosition.x + (currentX - previousPosition.x) * time;
+    const z = previousPosition.z + (currentZ - previousPosition.z) * time;
+    if (!isInsideRamp(ramp, x, z, 0)) continue;
+
+    hitRamp = ramp;
+    hitTime = time;
+    hitX = x;
+    hitZ = z;
+  }
+
+  if (!hitRamp) return false;
+
+  state.position.set(
+    hitX,
+    heightOnRamp(hitRamp, hitX, hitZ) - rampShellThickness(hitRamp) - padding,
+    hitZ,
+  );
+  const basis = getRampBasis(hitRamp);
+  scratch.surfaceNormal.set(-basis.normalX, -basis.normalY, -basis.normalZ);
+  clipVelocityInPlace(state.velocity, scratch.surfaceNormal);
+  state.contactState = 'air';
+  state.contactRampId = undefined;
+  state.contactNormal.set(0, 0, 0);
+  state.contactGraceRemaining = 0;
+  state.landingContactTime = 0;
+  return true;
+}
+
 function findContactCandidate(
   state: SurfPlayerState,
   level: SurfLevel,
@@ -460,7 +536,11 @@ function findContactCandidate(
 
     const previousHeight = heightOnRamp(ramp, previousPosition.x, previousPosition.z);
     const previousClearance = previousPosition.y - (previousHeight + SURF_TUNING.playerHeight);
-    if (previousClearance < -SURF_TUNING.surfacePenetrationTolerance && clearance < 0) continue;
+    // A surf catch must approach the top from on/above its plane. Previously,
+    // a below-to-above crossing was accepted whenever the current clearance
+    // happened to be positive, which let fast players tunnel through the
+    // visible shell and snap onto the rideable side.
+    if (previousClearance < -SURF_TUNING.surfacePenetrationTolerance) continue;
 
     const separationSpeed =
       state.velocity.x * basis.normalX +
@@ -728,7 +808,15 @@ function stepSurfPlayerInPlace(
   }
   state.position.addScaledVector(state.velocity, delta);
 
-  resolveSurfaceContact(state, level, scratch.previousPosition, delta, scratch);
+  const hitRampUnderside = resolveRampUndersideCollision(
+    state,
+    level,
+    scratch.previousPosition,
+    scratch,
+  );
+  if (!hitRampUnderside) {
+    resolveSurfaceContact(state, level, scratch.previousPosition, delta, scratch);
+  }
 
   const settledOnLanding =
     state.contactState === 'ramp' && state.contactRampId === level.goal.rampId;

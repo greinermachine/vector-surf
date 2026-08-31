@@ -13,6 +13,7 @@ import { SURF_TUNING } from '../game/config';
 import {
   primaryRouteRamp,
   rampRouteGroups,
+  rampRouteLinks,
   routeGroupPoint,
   type RampRouteGroup,
 } from '../game/course';
@@ -28,8 +29,10 @@ import {
 } from '../game/rampGeometry';
 import type { RampDefinition, SurfLevel } from '../game/types';
 import { CanyonSignalMap } from '../levels/maps/canyonSignal/CanyonSignalMap';
+import { DynamoRiseMap } from '../levels/maps/dynamoRise/DynamoRiseMap';
 import { FirstSurfMap } from '../levels/maps/firstSurfMap/FirstSurfMap';
 import { ParallaxMap } from '../levels/maps/parallax/ParallaxMap';
+import { ScrapyardJunctionsMap } from '../levels/maps/switchyard/ScrapyardJunctionsMap';
 
 type Point = RampPoint;
 
@@ -230,11 +233,10 @@ function CourseRamps({
 
 function RouteConnectors({ level }: { level: SurfLevel }) {
   const geometry = useMemo(() => {
-    const groups = rampRouteGroups(level);
     const positions: number[] = [];
-    for (let index = 0; index < groups.length - 1; index += 1) {
-      const fromPoint = routeGroupPoint(groups[index], true);
-      const toPoint = routeGroupPoint(groups[index + 1], false);
+    for (const link of rampRouteLinks(level)) {
+      const fromPoint = routeGroupPoint(link.from, true);
+      const toPoint = routeGroupPoint(link.to, false);
       positions.push(
         fromPoint.x, fromPoint.y + 0.08, fromPoint.z,
         toPoint.x, toPoint.y + 0.08, toPoint.z,
@@ -396,6 +398,10 @@ export function CourseWorld({
         return <ParallaxMap level={level} />;
       case 'canyon-signal-map':
         return <CanyonSignalMap level={level} />;
+      case 'dynamo-rise-map':
+        return <DynamoRiseMap level={level} />;
+      case 'switchyard-map':
+        return <ScrapyardJunctionsMap />;
       default:
         return <Architecture level={level} />;
     }

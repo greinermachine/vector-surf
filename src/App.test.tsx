@@ -3,6 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 
+function emptyLeaderboardResponse() {
+  return new Response(JSON.stringify({ entries: [], playerBest: null }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 vi.mock('./components/SurfGame', () => ({
   SurfGame: ({
     levelIndex,
@@ -27,8 +34,14 @@ vi.mock('./components/SurfGame', () => ({
 }));
 
 describe('standalone campaign shell', () => {
-  beforeEach(() => window.localStorage.clear());
-  afterEach(cleanup);
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.stubGlobal('fetch', vi.fn(async () => emptyLeaderboardResponse()));
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('presents the start-to-finish movement contract', () => {
     render(<App />);
@@ -49,7 +62,7 @@ describe('standalone campaign shell', () => {
     expect(screen.getByRole('heading', { name: 'Surf maps' })).toBeInTheDocument();
     const first = screen.getByRole('button', { name: /First Cut/i });
     const second = screen.getByRole('button', { name: /Crossfade/i });
-    const alpine = screen.getByRole('button', { name: /Alpine Flow/i });
+    const alpine = screen.getByRole('button', { name: /^Play Alpine Flow/i });
     expect(first).toBeEnabled();
     expect(second).toBeDisabled();
     expect(alpine).toBeDisabled();
@@ -91,11 +104,13 @@ describe('standalone campaign shell', () => {
     }));
     render(<App />);
     await user.click(screen.getByRole('button', { name: /Map select/i }));
-    await user.click(screen.getByRole('button', { name: /Alpine Flow/i }));
+    await user.click(screen.getByRole('button', { name: /^Play Alpine Flow/i }));
     await user.click(screen.getByTestId('surf-game'));
 
     expect(screen.getByRole('heading', { name: 'Alpine Flow' })).toBeInTheDocument();
-    expect(screen.getAllByText('00:08.000')).toHaveLength(2);
+    expect(screen.getAllByText('00:08.000').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('NEW PERSONAL BEST')).toBeInTheDocument();
+    expect(screen.getByLabelText('Display name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Retry/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Map select/i })).toBeEnabled();
     expect(JSON.parse(window.localStorage.getItem('vector-surf:progress:v1')!).bestTimes['alpine-flow']).toBe(8);
@@ -104,11 +119,11 @@ describe('standalone campaign shell', () => {
     expect(screen.getByTestId('surf-game')).toHaveTextContent('level 7');
   });
 
-  it('keeps all three surf-map results separate and returns to map select', async () => {
+  it('keeps all five surf-map results separate and returns to map select', async () => {
     const user = userEvent.setup();
     window.localStorage.setItem('vector-surf:progress:v1', JSON.stringify({
       version: 1,
-      unlockedLevels: 9,
+      unlockedLevels: 11,
       bestTimes: {},
       peakSpeeds: {},
     }));
@@ -118,9 +133,11 @@ describe('standalone campaign shell', () => {
       ['Alpine Flow', 7],
       ['Parallax', 8],
       ['Canyon Signal', 9],
+      ['Dynamo Rise', 10],
+      ['Scrapyard Junctions', 11],
     ] as const) {
       await user.click(screen.getByRole('button', { name: /Map select/i }));
-      await user.click(screen.getByRole('button', { name: new RegExp(name, 'i') }));
+      await user.click(screen.getByRole('button', { name: new RegExp(`^Play ${name}`, 'i') }));
       expect(screen.getByTestId('surf-game')).toHaveTextContent(`level ${levelNumber}`);
       await user.click(screen.getByTestId('surf-game'));
       expect(screen.getByRole('heading', { name })).toBeInTheDocument();
@@ -130,6 +147,71 @@ describe('standalone campaign shell', () => {
       'alpine-flow': 8,
       parallax: 8,
       'canyon-signal': 8,
+      'dynamo-rise': 8,
+      switchyard: 8,
     });
+  });
+
+  it('opens a public leaderboard from map select, including for a locked map', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /Map select/i }));
+    const lockedPlay = screen.getByRole('button', { name: /^Play Parallax/i });
+    expect(lockedPlay).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /Leaderboard \/ Parallax/i }));
+    expect(screen.getByRole('heading', { name: 'Parallax' })).toBeInTheDocument();
+    expect(await screen.findByText('NO TIMES YET')).toBeInTheDocument();
+  });
+
+  it('does not fetch leaderboard data while a surf run is active', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('vector-surf:progress:v1', JSON.stringify({
+      version: 1,
+      unlockedLevels: 7,
+      bestTimes: {},
+      peakSpeeds: {},
+    }));
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /Map select/i }));
+    await user.click(screen.getByRole('button', { name: /^Play Alpine Flow/i }));
+    expect(screen.getByTestId('surf-game')).toHaveTextContent('level 7');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the local personal best and retry controls when the network is unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('offline');
+    }));
+    const user = userEvent.setup();
+    window.localStorage.setItem('vector-surf:progress:v1', JSON.stringify({
+      version: 1,
+      unlockedLevels: 7,
+      bestTimes: {},
+      peakSpeeds: {},
+    }));
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /Map select/i }));
+    await user.click(screen.getByRole('button', { name: /^Play Alpine Flow/i }));
+    await user.click(screen.getByTestId('surf-game'));
+    expect(await screen.findByText('Leaderboard unavailable.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Retry/i })).toBeEnabled();
+    expect(JSON.parse(window.localStorage.getItem('vector-surf:progress:v1')!).bestTimes['alpine-flow'])
+      .toBe(8);
+  });
+
+  it('prefills the remembered display name after a page reload', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('vector-surf:leaderboard-player-name:v1', 'Greiner');
+    window.localStorage.setItem('vector-surf:progress:v1', JSON.stringify({
+      version: 1,
+      unlockedLevels: 7,
+      bestTimes: {},
+      peakSpeeds: {},
+    }));
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: /Map select/i }));
+    await user.click(screen.getByRole('button', { name: /^Play Alpine Flow/i }));
+    await user.click(screen.getByTestId('surf-game'));
+    expect(screen.getByLabelText('Display name')).toHaveValue('Greiner');
   });
 });

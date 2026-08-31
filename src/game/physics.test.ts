@@ -1,18 +1,27 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { SURF_TUNING } from './config';
+import { createDualSurfRamp } from './dualRamp';
 import {
   primaryRouteRamp,
   rampRouteGroups,
   routeGroupIndexForRamp,
+  type RampRouteGroup,
 } from './course';
+import {
+  SCRAPYARD_BRANCH_IDS,
+  SCRAPYARD_ROUTES,
+  SWITCHYARD_MAP,
+} from '../levels/maps/switchyard/config';
 import { SURF_LEVELS, getSurfLevel } from './levels';
 import {
   getRampBasis,
+  heightOnRamp,
   rampCoordinates,
   rampHeading,
   rampSurfacePoint,
 } from './ramp';
+import { createSurfRamp, rampShellThickness } from './rampProfiles';
 import {
   advanceWithFixedSteps,
   applyPlatformFriction,
@@ -32,6 +41,7 @@ import {
   steerVelocityTowardRampDirection,
   stepSurfPlayer,
 } from './physics';
+import type { SurfLevel } from './types';
 
 const TRAINING_LEVELS = SURF_LEVELS.filter((level) => level.format !== 'full-map');
 const FULL_MAPS = SURF_LEVELS.filter((level) => level.format === 'full-map');
@@ -60,9 +70,40 @@ function playerOnBank(levelIndex = 0, rampIndex = 1, speed = 24) {
   return { level, ramp, basis, state };
 }
 
-function scriptedRide(levelIndex: number, maximumSeconds = 36) {
+function scriptedRoute(
+  level: SurfLevel,
+  rampIds: readonly string[] | undefined,
+): readonly RampRouteGroup[] {
+  if (!rampIds) return rampRouteGroups(level);
+  return rampIds.map((rampId) => {
+    const ramp = level.ramps.find((candidate) => candidate.id === rampId);
+    if (!ramp) throw new Error(`Scripted route references unknown ramp ${rampId}.`);
+    const siblings = ramp.dual
+      ? level.ramps.filter((candidate) => (
+        candidate.dual?.id === ramp.dual?.id && candidate.id !== ramp.id
+      ))
+      : level.id === SWITCHYARD_MAP.id && SCRAPYARD_BRANCH_IDS.rejoin.includes(
+        ramp.id as (typeof SCRAPYARD_BRANCH_IDS.rejoin)[number],
+      )
+        ? SCRAPYARD_BRANCH_IDS.rejoin
+          .filter((candidateId) => candidateId !== ramp.id)
+          .map((candidateId) => level.ramps.find((candidate) => candidate.id === candidateId)!)
+        : [];
+    return { id: ramp.dual?.id ?? ramp.id, ramps: [ramp, ...siblings] };
+  });
+}
+
+function scriptedRide(
+  levelIndex: number,
+  maximumSeconds = 36,
+  rampIds?: readonly string[],
+  catchFractionOffset = 0,
+) {
   const level = getSurfLevel(levelIndex);
-  const route = rampRouteGroups(level);
+  const route = scriptedRoute(level, rampIds);
+  const selectedRamp = (group: RampRouteGroup) => (
+    rampIds ? group.ramps[0] : primaryRouteRamp(group)
+  );
   let state = createSurfPlayer(level);
   let accumulator = 0;
   let routeIndex = 0;
@@ -92,9 +133,9 @@ function scriptedRide(levelIndex: number, maximumSeconds = 36) {
     const activeRamp = state.contactRampId
       ? currentGroup.ramps.find((ramp) => ramp.id === state.contactRampId)
       : undefined;
-    const current = activeRamp ?? primaryRouteRamp(currentGroup);
+    const current = activeRamp ?? selectedRamp(currentGroup);
     const nextGroup = route[routeIndex + 1];
-    const next = nextGroup ? primaryRouteRamp(nextGroup) : undefined;
+    const next = nextGroup ? selectedRamp(nextGroup) : undefined;
     const basis = getRampBasis(current);
     const coordinates = rampCoordinates(current, state.position.x, state.position.z);
     const exitHeightFraction = Math.min(0.345, 0.22 + level.difficulty * 0.025);
@@ -109,9 +150,14 @@ function scriptedRide(levelIndex: number, maximumSeconds = 36) {
     if (next) {
       // Aim into the high half of the next face so the transfer has a shallow
       // inward component instead of meeting an alternating bank from outside.
-      const catchFraction = next.id === 'map01-cave-exit'
+      const baseCatchFraction = next.id === 'map01-cave-exit'
         ? 0
-        : 0.38;
+        : next.id === 'map04-chamber-drop'
+          ? 0.12
+          : next.id === 'map05-processing-drop'
+            ? 0.12
+          : 0.38;
+      const catchFraction = Math.max(0, Math.min(0.46, baseCatchFraction + catchFractionOffset));
       const nextHighSide = current.kind === 'start'
         ? 0
         : Math.sign(next.bankRadians) * next.width * catchFraction;
@@ -258,6 +304,101 @@ function scriptedRide(levelIndex: number, maximumSeconds = 36) {
   };
 }
 
+const UNDERSIDE_TEST_RAMP = createSurfRamp({
+  id: 'underside-test-ramp',
+  kind: 'bank',
+  start: [0, 0],
+  end: [0, 80],
+  startY: 28,
+  endY: 17,
+  profile: 'normal',
+  bankDirection: 1,
+  color: '#334455',
+  edgeColor: '#ffffff',
+});
+
+function undersideTestLevel(ramps = [UNDERSIDE_TEST_RAMP]): SurfLevel {
+  const spawnRamp = ramps[0];
+  return {
+    id: 'underside-collision-fixture',
+    number: 999,
+    format: 'full-map',
+    name: 'Underside fixture',
+    subtitle: 'Collision test',
+    briefing: 'Collision test',
+    cue: 'Collision test',
+    difficulty: 1,
+    parTime: 30,
+    palette: {
+      sky: '#000000',
+      fog: '#000000',
+      void: '#000000',
+      structure: '#333333',
+      accent: '#ffffff',
+      accentHot: '#ffffff',
+    },
+    spawn: {
+      position: rampSurfacePoint(spawnRamp, 0, 8).add(
+        new Vector3(0, SURF_TUNING.playerHeight, 0),
+      ),
+      yaw: rampHeading(spawnRamp),
+      speed: 0,
+    },
+    ramps,
+    goal: {
+      rampId: spawnRamp.id,
+      position: rampSurfacePoint(spawnRamp, 0, 72).add(
+        new Vector3(0, SURF_TUNING.playerHeight, 0),
+      ),
+      radius: 4,
+    },
+    world: {
+      kind: 'dynamo-rise-map',
+      fogNear: 100,
+      fogFar: 500,
+      cameraFar: 700,
+      resetDropDistance: 1_000,
+    },
+  };
+}
+
+function airborneBelowRamp(
+  level: SurfLevel,
+  ramp: SurfLevel['ramps'][number],
+  lateral: number,
+  distance: number,
+  belowUnderside: number,
+  velocity: Vector3,
+) {
+  const state = createSurfPlayer(level);
+  state.position.copy(rampSurfacePoint(ramp, lateral, distance));
+  state.position.y -= rampShellThickness(ramp) + belowUnderside;
+  state.velocity.copy(velocity);
+  state.contactState = 'air';
+  state.contactRampId = undefined;
+  state.contactNormal.set(0, 0, 0);
+  state.contactGraceRemaining = 0;
+  state.surfingStarted = true;
+  return state;
+}
+
+function expectUndersideBlock(
+  state: ReturnType<typeof createSurfPlayer>,
+  ramp: SurfLevel['ramps'][number],
+) {
+  const undersideY = heightOnRamp(ramp, state.position.x, state.position.z) -
+    rampShellThickness(ramp);
+  const basis = getRampBasis(ramp);
+  const undersideNormal = new Vector3(-basis.normalX, -basis.normalY, -basis.normalZ);
+  expect(state.contactState).toBe('air');
+  expect(state.contactRampId).toBeUndefined();
+  expect(state.position.y).toBeCloseTo(
+    undersideY - SURF_TUNING.rampUndersideCollisionPadding,
+    6,
+  );
+  expect(state.velocity.dot(undersideNormal)).toBeGreaterThanOrEqual(-1e-7);
+}
+
 describe('standalone surf physics', () => {
   it('clips penetration while retaining tangential momentum', () => {
     const clipped = clipVelocityAgainstPlane(new Vector3(7, -9, 18), new Vector3(0, 1, 0));
@@ -280,6 +421,132 @@ describe('standalone surf physics', () => {
     expect(directImpact.length()).toBeLessThan(3);
     expect(projectVelocityOntoPlane(shallowCatch, normal).dot(normal)).toBeCloseTo(0, 7);
   });
+
+  it.each([
+    ['low speed', 0.12, 32, SURF_TUNING.fixedStep],
+    ['high speed', 1.35, 300, 1 / 30],
+  ] as const)('blocks a %s approach through a ramp underside', (_label, below, speed, delta) => {
+    const level = undersideTestLevel();
+    const state = airborneBelowRamp(
+      level,
+      UNDERSIDE_TEST_RAMP,
+      0,
+      38,
+      below,
+      new Vector3(0, speed, 0),
+    );
+    const result = stepSurfPlayer(state, input(), level, delta);
+    expectUndersideBlock(result, UNDERSIDE_TEST_RAMP);
+  });
+
+  it('sweeps diagonal underside hits at an exposed edge without catching empty space', () => {
+    const level = undersideTestLevel();
+    const basis = getRampBasis(UNDERSIDE_TEST_RAMP);
+    const diagonalVelocity = new Vector3(
+      basis.rightX * 30 + basis.forwardX * 45,
+      220,
+      basis.rightZ * 30 + basis.forwardZ * 45,
+    );
+    const inside = airborneBelowRamp(
+      level,
+      UNDERSIDE_TEST_RAMP,
+      UNDERSIDE_TEST_RAMP.width / 2 - 0.45,
+      39,
+      0.9,
+      diagonalVelocity,
+    );
+    const outside = airborneBelowRamp(
+      level,
+      UNDERSIDE_TEST_RAMP,
+      UNDERSIDE_TEST_RAMP.width / 2 + 0.2,
+      39,
+      0.9,
+      diagonalVelocity,
+    );
+
+    const blocked = stepSurfPlayer(inside, input(), level, SURF_TUNING.fixedStep);
+    const missed = stepSurfPlayer(outside, input(), level, SURF_TUNING.fixedStep);
+    expectUndersideBlock(blocked, UNDERSIDE_TEST_RAMP);
+    expect(missed.contactState).toBe('air');
+    expect(missed.position.y).toBeGreaterThan(
+      heightOnRamp(UNDERSIDE_TEST_RAMP, missed.position.x, missed.position.z) -
+        rampShellThickness(UNDERSIDE_TEST_RAMP),
+    );
+  });
+
+  it('blocks the underside of both faces in a dual ramp', () => {
+    const dual = createDualSurfRamp({
+      id: 'underside-dual',
+      start: [8, -12],
+      heading: 0.42,
+      length: 74,
+      width: 64,
+      ridgeStartY: 31,
+      ridgeEndY: 20,
+      sideHeight: 14,
+      leftColor: '#334455',
+      edgeColor: '#ffffff',
+    });
+    const level = undersideTestLevel([...dual.faces]);
+
+    for (const face of dual.faces) {
+      const state = airborneBelowRamp(
+        level,
+        face,
+        0,
+        32,
+        0.7,
+        new Vector3(0, 150, 0),
+      );
+      const result = stepSurfPlayer(state, input(), level, SURF_TUNING.fixedStep);
+      expectUndersideBlock(result, face);
+    }
+  });
+
+  it('still accepts an ordinary descending catch from above', () => {
+    const level = undersideTestLevel();
+    const state = createSurfPlayer(level);
+    const surface = rampSurfacePoint(UNDERSIDE_TEST_RAMP, 0, 42);
+    state.position.copy(surface).add(
+      new Vector3(0, SURF_TUNING.playerHeight + 0.08, 0),
+    );
+    state.velocity.set(0, -28, 0);
+    state.contactState = 'air';
+    state.contactRampId = undefined;
+    state.contactNormal.set(0, 0, 0);
+    state.contactGraceRemaining = 0;
+
+    const result = stepSurfPlayer(state, input(), level, SURF_TUNING.fixedStep);
+    expect(result.contactState).toBe('ramp');
+    expect(result.contactRampId).toBe(UNDERSIDE_TEST_RAMP.id);
+    expect(result.position.y).toBeCloseTo(
+      heightOnRamp(UNDERSIDE_TEST_RAMP, result.position.x, result.position.z) +
+        SURF_TUNING.playerHeight,
+      6,
+    );
+  });
+
+  it.each(SWITCHYARD_MAP.ramps.map((ramp) => [ramp.id, ramp] as const))(
+    'keeps the Scrapyard underside solid on %s',
+    (_rampId, ramp) => {
+      const basis = getRampBasis(ramp);
+      const state = airborneBelowRamp(
+        SWITCHYARD_MAP,
+        ramp,
+        0,
+        basis.length * 0.5,
+        0.7,
+        new Vector3(0, 180, 0),
+      );
+      const result = stepSurfPlayer(
+        state,
+        input(),
+        SWITCHYARD_MAP,
+        SURF_TUNING.fixedStep,
+      );
+      expectUndersideBlock(result, ramp);
+    },
+  );
 
   it('uses only camera-relative lateral wish for A and D', () => {
     expect(computeWishDirection(0, -1).x).toBeCloseTo(1);
@@ -766,15 +1033,20 @@ describe('standalone surf physics', () => {
     },
   );
 
-  it.each(FULL_MAPS.map((level) => [level.id, SURF_LEVELS.indexOf(level)] as const))(
+  it.each(FULL_MAPS.filter((level) => level.id !== 'switchyard').map((level) => [
+    level.id,
+    SURF_LEVELS.indexOf(level),
+    undefined,
+  ] as const))(
     'keeps full map %s reachable across its deliberately longer transfers',
-    (_levelId, levelIndex) => {
+    (_levelId, levelIndex, rampIds) => {
     const level = getSurfLevel(levelIndex);
-    const outcome = scriptedRide(levelIndex, 120);
+    const authoredRoute = scriptedRoute(level, rampIds);
+    const outcome = scriptedRide(levelIndex, 120, rampIds);
     const diagnostics = JSON.stringify({
       level: level.id,
       furthestRouteIndex: outcome.furthestRouteIndex,
-      finalRouteIndex: rampRouteGroups(level).length - 1,
+      finalRouteIndex: authoredRoute.length - 1,
       position: outcome.state.position.toArray(),
       velocity: outcome.state.velocity.toArray(),
       resets: outcome.state.resets,
@@ -782,8 +1054,8 @@ describe('standalone surf physics', () => {
       airSegments: outcome.airSegments,
       minimumCatchSpeedRatio: Math.min(...outcome.catchSpeedRatios),
       approachSamples: outcome.approachSamples,
-      authoredRoute: rampRouteGroups(level).map((group) => {
-        const ramp = primaryRouteRamp(group);
+      authoredRoute: authoredRoute.map((group) => {
+        const ramp = rampIds ? group.ramps[0] : primaryRouteRamp(group);
         return {
           id: group.id,
           start: ramp.start,
@@ -795,11 +1067,52 @@ describe('standalone surf physics', () => {
       }),
       events: outcome.events.slice(0, 100),
     });
-    expect(outcome.furthestRouteIndex, diagnostics).toBe(rampRouteGroups(level).length - 1);
+    expect(outcome.furthestRouteIndex, diagnostics).toBe(authoredRoute.length - 1);
     expect(outcome.state.complete, diagnostics).toBe(true);
     expect(outcome.state.resets, diagnostics).toBe(0);
     expect(Math.max(...outcome.airSegments), diagnostics).toBeGreaterThanOrEqual(30);
-    expect(Math.min(...outcome.catchSpeedRatios), diagnostics).toBeGreaterThan(0.6);
+    const minimumCatchSpeedRatio = level.id === 'dynamo-rise'
+      ? 0.35
+      : 0.6;
+    expect(Math.min(...outcome.catchSpeedRatios), diagnostics).toBeGreaterThan(
+      minimumCatchSpeedRatio,
+    );
     },
   );
+
+  it.each(SCRAPYARD_ROUTES.flatMap((route) => (
+    [-0.03, 0, 0.03].map((catchOffset) => [
+      route.id,
+      route.identity,
+      catchOffset,
+      route.rampIds,
+    ] as const)
+  )))(
+    'keeps Scrapyard route %s (%s) repeatable at catch offset %f',
+    (_routeId, _identity, catchOffset, rampIds) => {
+      const levelIndex = SURF_LEVELS.indexOf(SWITCHYARD_MAP);
+      const authoredRoute = scriptedRoute(SWITCHYARD_MAP, rampIds);
+      const outcome = scriptedRide(levelIndex, 120, rampIds, catchOffset);
+      const diagnostics = JSON.stringify({
+        route: _routeId,
+        catchOffset,
+        furthestRouteIndex: outcome.furthestRouteIndex,
+        finalRouteIndex: authoredRoute.length - 1,
+        position: outcome.state.position.toArray(),
+        velocity: outcome.state.velocity.toArray(),
+        resets: outcome.state.resets,
+        contact: outcome.state.contactRampId,
+        airSegments: outcome.airSegments,
+        minimumCatchSpeedRatio: Math.min(...outcome.catchSpeedRatios),
+        approachSamples: outcome.approachSamples,
+        events: outcome.events.slice(0, 100),
+      });
+      expect(outcome.furthestRouteIndex, diagnostics).toBe(authoredRoute.length - 1);
+      expect(outcome.state.complete, diagnostics).toBe(true);
+      expect(outcome.state.resets, diagnostics).toBe(0);
+      expect(Math.max(...outcome.airSegments), diagnostics).toBeGreaterThanOrEqual(30);
+      expect(Math.min(...outcome.catchSpeedRatios), diagnostics).toBeGreaterThan(0.35);
+    },
+  );
+
 });

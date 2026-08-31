@@ -1,7 +1,9 @@
 import { Vector3 } from 'three';
 import { CANYON_SIGNAL_MAP } from '../levels/maps/canyonSignal/config';
+import { DYNAMO_RISE_MAP } from '../levels/maps/dynamoRise/config';
 import { FIRST_SURF_MAP } from '../levels/maps/firstSurfMap/config';
 import { PARALLAX_MAP } from '../levels/maps/parallax/config';
+import { SWITCHYARD_MAP } from '../levels/maps/switchyard/config';
 import { SURF_TUNING } from './config';
 import { dualizeRamp } from './dualRamp';
 import { getRampBasis, rampHeading, rampSurfacePoint } from './ramp';
@@ -392,6 +394,8 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
   FIRST_SURF_MAP,
   PARALLAX_MAP,
   CANYON_SIGNAL_MAP,
+  DYNAMO_RISE_MAP,
+  SWITCHYARD_MAP,
 ] as const;
 
 export const TUTORIAL_LEVELS = SURF_LEVELS.filter((level) => level.format === 'training');

@@ -19,6 +19,7 @@ export const SURF_TUNING = {
   surfaceSnapDistance: 1.16,
   surfacePenetrationTolerance: 0.44,
   surfaceSweepPadding: 0.2,
+  rampUndersideCollisionPadding: 0.035,
   rampBoundsForgiveness: 0.5,
   contactGraceTime: 0.14,
   contactGraceBounds: 0.76,

@@ -7,6 +7,11 @@ export type RampRouteGroup = {
   ramps: readonly RampDefinition[];
 };
 
+export type RampRouteLink = {
+  from: RampRouteGroup;
+  to: RampRouteGroup;
+};
+
 export function rampRouteGroups(level: SurfLevel): readonly RampRouteGroup[] {
   const groups: RampRouteGroup[] = [];
   for (const ramp of level.ramps) {
@@ -26,6 +31,25 @@ export function rampRouteGroups(level: SurfLevel): readonly RampRouteGroup[] {
 
 export function primaryRouteRamp(group: RampRouteGroup): RampDefinition {
   return group.ramps.find((ramp) => ramp.dual?.preferred) ?? group.ramps[0];
+}
+
+export function rampRouteLinks(level: SurfLevel): readonly RampRouteLink[] {
+  const groups = rampRouteGroups(level);
+  if (!level.routeLinks) {
+    return groups.slice(1).map((to, index) => ({ from: groups[index], to }));
+  }
+
+  const groupsById = new Map(groups.map((group) => [group.id, group]));
+  return level.routeLinks.map((link) => {
+    const from = groupsById.get(link.from);
+    const to = groupsById.get(link.to);
+    if (!from || !to) {
+      throw new Error(
+        `Level ${level.id} route link ${link.from} -> ${link.to} references an unknown ramp group.`,
+      );
+    }
+    return { from, to };
+  });
 }
 
 export function routeGroupIndexForRamp(

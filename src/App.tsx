@@ -1,5 +1,15 @@
 import { useState } from 'react';
 import { SurfGame } from './components/SurfGame';
+import { LeaderboardPanel } from './leaderboard/LeaderboardPanel';
+import {
+  isLeaderboardMapId,
+  type LeaderboardMapId,
+} from './leaderboard/contracts';
+import {
+  getOrCreateAnonymousPlayerId,
+  readRememberedPlayerName,
+  rememberPlayerName,
+} from './leaderboard/identity';
 import {
   FULL_SURF_MAPS,
   SURF_LEVELS,
@@ -19,11 +29,13 @@ type Screen =
   | { name: 'menu' }
   | { name: 'levels' }
   | { name: 'playing'; levelIndex: number }
+  | { name: 'leaderboard'; levelIndex: number }
   | {
     name: 'complete';
     levelIndex: number;
     result: RunResult;
     bestTime: number;
+    isNewPersonalBest: boolean;
   };
 
 function readProgress() {
@@ -72,6 +84,8 @@ function Difficulty({ value }: { value: number }) {
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'menu' });
   const [progress, setProgress] = useState<SurfProgress>(readProgress);
+  const [anonymousPlayerId] = useState(getOrCreateAnonymousPlayerId);
+  const [rememberedPlayerName, setRememberedPlayerName] = useState(readRememberedPlayerName);
 
   const startLevel = (levelIndex: number) => {
     const safeIndex = Math.max(0, Math.min(progress.unlockedLevels - 1, levelIndex));
@@ -80,6 +94,7 @@ export function App() {
 
   const finishLevel = (result: RunResult) => {
     const level = SURF_LEVELS[result.levelIndex];
+    const previousBest = progress.bestTimes[level.id];
     const nextProgress = recordResult(progress, level.id, result, SURF_LEVELS.length);
     setProgress(nextProgress);
     saveProgress(nextProgress);
@@ -93,7 +108,13 @@ export function App() {
       levelIndex: result.levelIndex,
       result,
       bestTime: nextProgress.bestTimes[level.id],
+      isNewPersonalBest: previousBest === undefined || result.elapsed < previousBest,
     });
+  };
+
+  const rememberLeaderboardName = (playerName: string) => {
+    const remembered = rememberPlayerName(playerName);
+    if (remembered) setRememberedPlayerName(remembered);
   };
 
   if (screen.name === 'playing') {
@@ -104,6 +125,30 @@ export function App() {
         onComplete={finishLevel}
         onExit={() => setScreen({ name: 'levels' })}
       />
+    );
+  }
+
+  if (screen.name === 'leaderboard') {
+    const level = SURF_LEVELS[screen.levelIndex];
+    const mapId = level.id as LeaderboardMapId;
+    return (
+      <main
+        className={styles.page}
+        data-screen="leaderboard"
+        style={{ '--level-accent': level.palette.accent } as React.CSSProperties}
+      >
+        <header className={styles.topbar}>
+          <Brand />
+          <button className={styles.textButton} type="button" onClick={() => setScreen({ name: 'levels' })}>
+            Back to maps
+          </button>
+        </header>
+        <section className={styles.leaderboardSection} aria-labelledby="leaderboard-heading">
+          <p className={styles.eyebrow}>Surf map {String(level.mapNumber ?? 1).padStart(2, '0')} / rankings</p>
+          <h1 id="leaderboard-heading">{level.name}</h1>
+          <LeaderboardPanel mapId={mapId} anonymousPlayerId={anonymousPlayerId} />
+        </section>
+      </main>
     );
   }
 
@@ -129,9 +174,10 @@ export function App() {
           <div className={styles.resultTime}>
             <span>FINAL TIME</span>
             <strong>{formatTime(screen.result.elapsed)}</strong>
+            {screen.isNewPersonalBest && <em>NEW PERSONAL BEST</em>}
           </div>
           <div className={styles.resultMeta}>
-            <span>BEST <b>{formatTime(screen.bestTime)}</b></span>
+            <span>LOCAL BEST <b>{formatTime(screen.bestTime)}</b></span>
             <span>PEAK <b>{screen.result.peakSpeed.toFixed(1)} u/s</b></span>
             <span>RESETS <b>{String(screen.result.resets).padStart(2, '0')}</b></span>
           </div>
@@ -151,6 +197,15 @@ export function App() {
               Map select
             </button>
           </div>
+          {isLeaderboardMapId(level.id) && (
+            <LeaderboardPanel
+              mapId={level.id}
+              anonymousPlayerId={anonymousPlayerId}
+              runTimeMs={Math.round(screen.result.elapsed * 1_000)}
+              rememberedPlayerName={rememberedPlayerName}
+              onRememberPlayerName={rememberLeaderboardName}
+            />
+          )}
         </section>
       </main>
     );
@@ -163,6 +218,44 @@ export function App() {
       const displayNumber = level.format === 'full-map'
         ? level.mapNumber ?? index - TUTORIAL_LEVELS.length + 1
         : level.number;
+      const cardContents = (
+        <>
+          <span className={styles.levelNumber}>{String(displayNumber).padStart(2, '0')}</span>
+          <span className={styles.levelLock}>
+            {unlocked ? level.format === 'full-map' ? 'SURF MAP' : 'TUTORIAL' : 'LOCKED'}
+          </span>
+          <span className={styles.levelName}>{level.name}</span>
+          <span className={styles.levelSubtitle}>{level.subtitle}</span>
+          <span className={styles.cardDivider} />
+          <span className={styles.levelMeta}>
+            <span>LOCAL BEST <b>{formatTime(progress.bestTimes[level.id])}</b></span>
+            <span>PEAK <b>{progress.peakSpeeds[level.id]?.toFixed(1) ?? '--.-'} u/s</b></span>
+          </span>
+          <Difficulty value={level.difficulty} />
+        </>
+      );
+
+      if (level.format === 'full-map' && isLeaderboardMapId(level.id)) {
+        return (
+          <article
+            className={styles.levelCard}
+            key={level.id}
+            data-locked={!unlocked}
+            style={{ '--level-accent': level.palette.accent } as React.CSSProperties}
+          >
+            {cardContents}
+            <div className={styles.cardActions}>
+              <button type="button" disabled={!unlocked} onClick={() => startLevel(index)}>
+                Play {level.name} <span>→</span>
+              </button>
+              <button type="button" onClick={() => setScreen({ name: 'leaderboard', levelIndex: index })}>
+                Leaderboard / {level.name}
+              </button>
+            </div>
+          </article>
+        );
+      }
+
       return (
         <button
           className={styles.levelCard}
@@ -172,18 +265,7 @@ export function App() {
           onClick={() => startLevel(index)}
           style={{ '--level-accent': level.palette.accent } as React.CSSProperties}
         >
-          <span className={styles.levelNumber}>{String(displayNumber).padStart(2, '0')}</span>
-          <span className={styles.levelLock}>
-            {unlocked ? level.format === 'full-map' ? 'SURF MAP' : 'TUTORIAL' : 'LOCKED'}
-          </span>
-          <span className={styles.levelName}>{level.name}</span>
-          <span className={styles.levelSubtitle}>{level.subtitle}</span>
-          <span className={styles.cardDivider} />
-          <span className={styles.levelMeta}>
-            <span>BEST <b>{formatTime(progress.bestTimes[level.id])}</b></span>
-            <span>PEAK <b>{progress.peakSpeeds[level.id]?.toFixed(1) ?? '--.-'} u/s</b></span>
-          </span>
-          <Difficulty value={level.difficulty} />
+          {cardContents}
         </button>
       );
     };
@@ -218,7 +300,7 @@ export function App() {
           <div className={styles.levelGroup} aria-labelledby="surf-maps-heading">
             <div className={styles.levelGroupHeading}>
               <h2 id="surf-maps-heading">Surf maps</h2>
-              <span>Three continuous timed runs</span>
+              <span>{FULL_SURF_MAPS.length} continuous timed runs</span>
             </div>
             <div className={styles.levelGrid} data-course-grid="surf-maps">
               {FULL_SURF_MAPS.map(renderLevelCard)}
@@ -246,7 +328,7 @@ export function App() {
         <p className={styles.eyebrow}>First-person momentum trial</p>
         <h1><span>VECTOR</span><span>SURF</span></h1>
         <p className={styles.heroCopy}>
-          Learn the line through six focused tutorials, then chase flow and faster times across three complete surf maps.
+          Learn the line through six focused tutorials, then chase flow, faster times, and the online top 20 across {FULL_SURF_MAPS.length} complete surf maps.
         </p>
         <div className={styles.menuActions}>
           <button className={styles.primaryButton} type="button" onClick={() => startLevel(continueIndex)}>

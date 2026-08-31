@@ -3,8 +3,18 @@ import { primaryRouteRamp, rampRouteGroups } from '../../game/course';
 import { getRampBasis, rampSurfacePoint } from '../../game/ramp';
 import { CANYON_SIGNAL_MAP } from './canyonSignal/config';
 import { buildCanyonEnvironment } from './canyonSignal/environment';
+import { DYNAMO_RISE_MAP } from './dynamoRise/config';
+import {
+  buildDynamoRiseEnvironment,
+  DYNAMO_RISE_MAJOR_MASS_COUNT,
+} from './dynamoRise/environment';
 import { PARALLAX_MAP } from './parallax/config';
 import { buildParallaxEnvironment } from './parallax/environment';
+import { SWITCHYARD_MAP } from './switchyard/config';
+import {
+  buildScrapyardEnvironment,
+  SCRAPYARD_ENVIRONMENT_BUDGET,
+} from './switchyard/environment';
 
 function expectFiniteTransforms(transforms: readonly {
   position: readonly [number, number, number];
@@ -43,11 +53,48 @@ describe('full-map decorative environments', () => {
   it('batches the Parallax architecture into a modest transform budget', () => {
     const rampIds = PARALLAX_MAP.ramps.map((ramp) => ramp.id);
     const transforms = buildParallaxEnvironment(PARALLAX_MAP);
-    expect(transforms).toHaveLength(122);
+    expect(transforms).toHaveLength(114);
+    expect(transforms.length).toBeLessThanOrEqual(122);
     expect(new Set(transforms.map((transform) => transform.material))).toEqual(
-      new Set(['concrete', 'shadow', 'orange', 'blue']),
+      new Set(['concrete', 'structure', 'glass', 'orange', 'blue']),
+    );
+    expect(new Set(transforms.map((transform) => transform.zone))).toEqual(
+      new Set([
+        'entry-atrium',
+        'long-gallery',
+        'vertical-shaft',
+        'bridge-void',
+        'final-hall',
+      ]),
+    );
+    expect(new Set(transforms.map((transform) => transform.role))).toEqual(
+      new Set([
+        'wall',
+        'foundation',
+        'ceiling',
+        'support',
+        'bridge',
+        'window',
+        'accent',
+        'plinth',
+      ]),
     );
     expectFiniteTransforms(transforms);
+    for (const zone of [
+      'entry-atrium',
+      'long-gallery',
+      'vertical-shaft',
+      'bridge-void',
+      'final-hall',
+    ] as const) {
+      const zoneTransforms = transforms.filter((transform) => transform.zone === zone);
+      expect(zoneTransforms.some((transform) => transform.role === 'wall')).toBe(true);
+      expect(zoneTransforms.some((transform) => (
+        transform.role === 'support'
+        || transform.role === 'foundation'
+        || transform.role === 'bridge'
+      ))).toBe(true);
+    }
     const route = rampRouteGroups(PARALLAX_MAP).map((group) => primaryRouteRamp(group));
     const supports = transforms.filter((transform) => (
       transform.scale[0] === 112 && transform.scale[1] === 5.5
@@ -65,14 +112,49 @@ describe('full-map decorative environments', () => {
   it('batches the Canyon Signal terrain without adding collision surfaces', () => {
     const rampIds = CANYON_SIGNAL_MAP.ramps.map((ramp) => ramp.id);
     const transforms = buildCanyonEnvironment(CANYON_SIGNAL_MAP);
-    expect(transforms).toHaveLength(98);
+    expect(transforms).toHaveLength(100);
     expect(transforms.length).toBeLessThanOrEqual(100);
     expect(new Set(transforms.map((transform) => transform.geometry))).toEqual(
       new Set(['rock', 'slab', 'mesa']),
     );
     expect(new Set(transforms.map((transform) => transform.material))).toEqual(
-      new Set(['sandstone', 'sunlit', 'cave', 'cyan']),
+      new Set(['sandstone', 'sunlit', 'cave', 'cyan', 'sunbeam']),
     );
+    expect(new Set(transforms.map((transform) => transform.zone))).toEqual(
+      new Set(['overlook-ravine', 'cavern', 'daylight-basin', 'horizon']),
+    );
+    expect(new Set(transforms.map((transform) => transform.role))).toEqual(
+      new Set([
+        'cliff',
+        'ledge',
+        'joint',
+        'cave-wall',
+        'cave-ceiling',
+        'arch',
+        'beacon',
+        'sunbeam',
+        'plateau',
+        'mesa',
+      ]),
+    );
+    expect(Object.fromEntries(
+      [...new Set(transforms.map((transform) => transform.role))]
+        .map((role) => [
+          role,
+          transforms.filter((transform) => transform.role === role).length,
+        ]),
+    )).toEqual({
+      cliff: 24,
+      ledge: 24,
+      joint: 12,
+      'cave-wall': 12,
+      'cave-ceiling': 6,
+      arch: 12,
+      beacon: 2,
+      sunbeam: 2,
+      plateau: 2,
+      mesa: 4,
+    });
     expectFiniteTransforms(transforms);
     const route = rampRouteGroups(CANYON_SIGNAL_MAP).map((group) => primaryRouteRamp(group));
     const supports = transforms.filter((transform) => (
@@ -88,5 +170,90 @@ describe('full-map decorative environments', () => {
     // Environment transforms are render-only. The authoritative collision list
     // remains the authored ramp array consumed by the shared surf simulation.
     expect(CANYON_SIGNAL_MAP.ramps.map((ramp) => ramp.id)).toEqual(rampIds);
+  });
+
+  it('builds Dynamo Rise from twenty instanced city masses with render-only details', () => {
+    const rampIds = DYNAMO_RISE_MAP.ramps.map((ramp) => ramp.id);
+    const transforms = buildDynamoRiseEnvironment(DYNAMO_RISE_MAP);
+    const towers = transforms.filter((transform) => transform.role === 'tower');
+
+    expect(transforms).toHaveLength(53);
+    expect(transforms.length).toBeLessThanOrEqual(56);
+    expect(DYNAMO_RISE_MAJOR_MASS_COUNT).toBe(20);
+    expect(towers).toHaveLength(DYNAMO_RISE_MAJOR_MASS_COUNT);
+    expect(new Set(transforms.map((transform) => transform.material))).toEqual(
+      new Set(['concrete', 'glass', 'shadow', 'cyan', 'amber']),
+    );
+    expect(new Set(transforms.map((transform) => transform.zone))).toEqual(
+      new Set(['opening', 'street-canyon', 'signature-gap', 'crown']),
+    );
+    expect(new Set(transforms.map((transform) => transform.role))).toEqual(
+      new Set(['tower', 'window-band', 'roof-crown', 'antenna', 'skybridge']),
+    );
+    expectFiniteTransforms(transforms);
+    for (const tower of towers) {
+      expect(tower.position[1] - tower.scale[1] / 2).toBeCloseTo(-92, 7);
+    }
+
+    // The skyline is presentation only; collision remains exactly the shared
+    // authored ramp array consumed by the surf simulation.
+    expect(DYNAMO_RISE_MAP.ramps.map((ramp) => ramp.id)).toEqual(rampIds);
+  });
+
+  it('batches Scrapyard Junctions into industrial macro masses and instanced repeats', () => {
+    const rampIds = SWITCHYARD_MAP.ramps.map((ramp) => ramp.id);
+    const transforms = buildScrapyardEnvironment();
+    const macroMasses = transforms.filter((transform) => transform.composition === 'macro');
+    const repeats = transforms.filter((transform) => transform.composition === 'repeat');
+
+    expect(transforms.length).toBeGreaterThanOrEqual(60);
+    expect(transforms.length).toBeLessThanOrEqual(SCRAPYARD_ENVIRONMENT_BUDGET);
+    expect(macroMasses.length).toBeLessThanOrEqual(44);
+    expect(repeats.length).toBeGreaterThanOrEqual(24);
+    expect(new Set(transforms.map((transform) => transform.geometry))).toEqual(
+      new Set(['box', 'cylinder']),
+    );
+    expect(new Set(transforms.map((transform) => transform.material))).toEqual(
+      new Set([
+        'dark-iron', 'rust', 'weathered-steel',
+        'industrial-green', 'safety-yellow', 'warning-red',
+      ]),
+    );
+    expect(new Set(transforms.map((transform) => transform.zone))).toEqual(
+      new Set([
+        'fork-yard', 'upper-yard', 'lower-works',
+        'processing-hall', 'control-platform',
+      ]),
+    );
+    expect(new Set(transforms.map((transform) => transform.role))).toEqual(
+      new Set([
+        'separator', 'warehouse', 'container', 'scrap-stack', 'crane',
+        'tunnel', 'pipe', 'crusher', 'hall', 'gantry', 'control-room',
+        'warning-light',
+      ]),
+    );
+    expectFiniteTransforms(transforms);
+
+    const forkSeparators = transforms.filter((transform) => transform.role === 'separator');
+    expect(forkSeparators).toHaveLength(3);
+    expect(Math.min(...forkSeparators.map((transform) => (
+      transform.position[2] - transform.scale[2] / 2
+    )))).toBeLessThanOrEqual(150);
+    expect(Math.max(...forkSeparators.map((transform) => (
+      transform.position[2] + transform.scale[2] / 2
+    )))).toBeGreaterThanOrEqual(780);
+    expect(transforms.some((transform) => (
+      transform.zone === 'upper-yard' && transform.role === 'crane'
+    ))).toBe(true);
+    expect(transforms.some((transform) => (
+      transform.zone === 'lower-works' && transform.role === 'crusher'
+    ))).toBe(true);
+    expect(transforms.some((transform) => (
+      transform.zone === 'processing-hall' && transform.role === 'hall'
+    ))).toBe(true);
+
+    // Dressing stays render-only and cannot add collider seams or mutate the
+    // authored ramp list used by the surf and underside collision passes.
+    expect(SWITCHYARD_MAP.ramps.map((ramp) => ramp.id)).toEqual(rampIds);
   });
 });

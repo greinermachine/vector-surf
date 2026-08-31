@@ -4,12 +4,12 @@ import {
   LeaderboardConfigurationError,
   LeaderboardRateLimitError,
   LeaderboardUpstreamError,
-} from '../server/leaderboardRepository';
+} from '../server/leaderboardRepository.js';
 import {
   getLeaderboardSnapshot,
   LeaderboardValidationError,
   submitScore,
-} from '../server/leaderboardService';
+} from '../server/leaderboardService.js';
 
 type VercelRequest = IncomingMessage & { body?: unknown };
 

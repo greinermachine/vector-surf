@@ -4,8 +4,8 @@ import {
   validateScoreSubmission,
   type LeaderboardSnapshot,
   type ScoreSubmissionResult,
-} from '../src/leaderboard/contracts';
-import type { LeaderboardRepository } from './leaderboardRepository';
+} from '../src/leaderboard/contracts.js';
+import type { LeaderboardRepository } from './leaderboardRepository.js';
 
 export class LeaderboardValidationError extends Error {
   constructor(message: string) {

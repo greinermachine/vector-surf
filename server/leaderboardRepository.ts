@@ -6,7 +6,7 @@ import {
   type ScoreSubmission,
   type ScoreSubmissionOutcome,
   type ScoreSubmissionResult,
-} from '../src/leaderboard/contracts';
+} from '../src/leaderboard/contracts.js';
 
 export interface LeaderboardRepository {
   getLeaderboard(

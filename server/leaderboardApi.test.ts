@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import leaderboardHandler from './leaderboard';
+import leaderboardHandler from '../api/leaderboard.js';
 
 const playerId = '8d9447e4-d81f-4f69-93e5-59b95e8901fa';
 const originalUrl = process.env.SUPABASE_URL;

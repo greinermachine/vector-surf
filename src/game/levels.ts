@@ -299,7 +299,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
     },
     spawn: { position: eyePosition(l1Start, 0, 8), yaw: rampHeading(l1Start), speed: 0 },
     ramps: [l1Start, l1a, l1b, l1Land],
-    goal: { rampId: l1Land.id, position: eyePosition(l1Land, 0, 48), radius: 7.5 },
+    goal: { rampId: l1Land.id },
   },
   {
     id: 'crossfade',
@@ -317,7 +317,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
     },
     spawn: { position: eyePosition(l2Start, 0, 8), yaw: rampHeading(l2Start), speed: 0 },
     ramps: [l2Start, l2a, l2b, l2c, l2Land],
-    goal: { rampId: l2Land.id, position: eyePosition(l2Land, 0, 44), radius: 6.8 },
+    goal: { rampId: l2Land.id },
   },
   {
     id: 'switchback',
@@ -335,7 +335,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
     },
     spawn: { position: eyePosition(l3Start, 0, 8), yaw: rampHeading(l3Start), speed: 0 },
     ramps: [l3Start, l3a, l3b, ...l3cDual.faces, l3d, l3Land],
-    goal: { rampId: l3Land.id, position: eyePosition(l3Land, 0, 44), radius: 6.2 },
+    goal: { rampId: l3Land.id },
   },
   {
     id: 'overdrive',
@@ -353,7 +353,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
     },
     spawn: { position: eyePosition(l4Start, 0, 8), yaw: rampHeading(l4Start), speed: 0 },
     ramps: [l4Start, l4a, ...l4bDual.faces, l4c, ...l4dDual.faces, l4e, l4Land],
-    goal: { rampId: l4Land.id, position: eyePosition(l4Land, 0, 44), radius: 5.8 },
+    goal: { rampId: l4Land.id },
   },
   {
     id: 'black-ice',
@@ -371,7 +371,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
     },
     spawn: { position: eyePosition(l5Start, 0, 8), yaw: rampHeading(l5Start), speed: 0 },
     ramps: [l5Start, l5a, ...l5bDual.faces, l5c, ...l5dDual.faces, l5e, ...l5fDual.faces, l5Land],
-    goal: { rampId: l5Land.id, position: eyePosition(l5Land, 0, 44), radius: 5.3 },
+    goal: { rampId: l5Land.id },
   },
   {
     id: 'last-light',
@@ -389,7 +389,7 @@ export const SURF_LEVELS: readonly SurfLevel[] = [
     },
     spawn: { position: eyePosition(l6Start, 0, 8), yaw: rampHeading(l6Start), speed: 0 },
     ramps: [l6Start, l6a, ...l6bDual.faces, l6c, ...l6dDual.faces, l6e, ...l6fDual.faces, l6g, l6Land],
-    goal: { rampId: l6Land.id, position: eyePosition(l6Land, 0, 48), radius: 5.4 },
+    goal: { rampId: l6Land.id },
   },
   FIRST_SURF_MAP,
   PARALLAX_MAP,

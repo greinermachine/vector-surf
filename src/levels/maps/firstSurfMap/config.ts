@@ -209,8 +209,10 @@ const s1d = followingBank(s1c, { id: 'map01-s1-d', heading: 0.58, length: 80, pr
 const s1dDual = dualizeRamp(s1d, 'map01-s1-d-wedge');
 const ridgeTransition = followingBank(s1d, { id: 'map01-ridge-transition', heading: 0.72, length: 62, profile: 'large', drop: 11, bankDirection: 1, gap: 28, entryDrop: 8, color: '#416467', edgeColor: '#efffce' });
 
-// Ravine transition: the same uninterrupted route folds through the cave.
+// Ravine transition: a paired face makes the awkward mid-map catch readable
+// from either approach while the original rightward continuation stays intact.
 const s2a = followingBank(ridgeTransition, { id: 'map01-s2-a', heading: 0.45, length: 72, profile: 'wide-catch', drop: 13, bankDirection: -1, gap: 44, approachLateral: -29, entryDrop: 35, color: '#414b4d', edgeColor: '#ffd28a' });
+const s2aDual = dualizeRamp(s2a, 'map01-s2-a-wedge');
 const s2b = followingBank(s2a, { id: 'map01-s2-b', heading: 0.1, length: 74, profile: 'normal', drop: 13, bankDirection: 1, gap: 40, entryDrop: 6, color: '#343f42', edgeColor: '#ffe2ad' });
 const s2bDual = dualizeRamp(s2b, 'map01-s2-b-wedge');
 const s2c = followingBank(s2b, { id: 'map01-s2-c', heading: -0.35, length: 76, profile: 'normal', drop: 13, bankDirection: -1, gap: 48, entryDrop: 9, color: '#424b4e', edgeColor: '#ffd28a' });
@@ -228,7 +230,7 @@ const s3cDual = dualizeRamp(s3c, 'map01-signature-wedge');
 const s3d = followingBank(s3c, { id: 'map01-s3-d', heading: -3.02, length: 88, profile: 'large', drop: 15, bankDirection: 1, gap: 62, entryDrop: 24, color: '#2a4b57', edgeColor: '#d6f9ff' });
 const s3dDual = dualizeRamp(s3d, 'map01-s3-d-wedge');
 const s3e = followingBank(s3d, { id: 'map01-s3-e', heading: 2.85, length: 88, profile: 'wide-catch', drop: 12, bankDirection: -1, gap: 30, entryDrop: 35, approachLateral: -60, color: '#355965', edgeColor: '#b7f4ff' });
-const landing = followingLanding(s3e, 2.65, 94, 'wide-catch', 46, 12, -0.4);
+const landing = followingLanding(s3e, 2.65, 130, 'wide-catch', 46, 12, -0.4);
 
 export const FIRST_SURF_MAP: SurfLevel = {
   id: FIRST_SURF_MAP_ID,
@@ -263,7 +265,7 @@ export const FIRST_SURF_MAP: SurfLevel = {
     s1c,
     ...s1dDual.faces,
     ridgeTransition,
-    s2a,
+    ...s2aDual.faces,
     ...s2bDual.faces,
     s2c,
     ...s2dDual.faces,
@@ -278,8 +280,6 @@ export const FIRST_SURF_MAP: SurfLevel = {
   ],
   goal: {
     rampId: landing.id,
-    position: eyePosition(landing, -16, 58),
-    radius: 11,
   },
   world: {
     kind: 'alpine-map',

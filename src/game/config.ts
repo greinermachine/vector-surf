@@ -18,8 +18,10 @@ export const SURF_TUNING = {
 
   surfaceSnapDistance: 1.16,
   surfacePenetrationTolerance: 0.44,
+  surfaceEdgeCatchDepth: 1.2,
   surfaceSweepPadding: 0.2,
   rampUndersideCollisionPadding: 0.035,
+  rampSideCollisionPadding: 0.035,
   rampBoundsForgiveness: 0.5,
   contactGraceTime: 0.14,
   contactGraceBounds: 0.76,
@@ -29,7 +31,6 @@ export const SURF_TUNING = {
 
   resetHeight: -96,
   resetDropDistance: 12,
-  goalPadding: 1.7,
   minimumLandingContactTime: 0.16,
   landingDrag: 0.12,
   completionDrag: 0.2,
@@ -50,5 +51,6 @@ export const SURF_TUNING = {
   maxFrameDelta: 0.05,
   maxSubsteps: 8,
   playerHeight: 1.5,
+  playerRadius: 0.42,
   telemetryInterval: 0.06,
 } as const;

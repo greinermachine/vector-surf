@@ -1,4 +1,6 @@
+import { Object3D, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
+import { SURF_TUNING } from '../../game/config';
 import { primaryRouteRamp, rampRouteGroups } from '../../game/course';
 import { getRampBasis, rampSurfacePoint } from '../../game/ramp';
 import { CANYON_SIGNAL_MAP } from './canyonSignal/config';
@@ -28,6 +30,28 @@ function expectFiniteTransforms(transforms: readonly {
   }
 }
 
+function containsPlayerEye(
+  transform: {
+    position: readonly [number, number, number];
+    scale: readonly [number, number, number];
+    rotation: readonly [number, number, number];
+  },
+  point: Vector3,
+) {
+  const object = new Object3D();
+  object.position.set(...transform.position);
+  object.scale.set(...transform.scale);
+  object.rotation.set(...transform.rotation);
+  object.updateMatrix();
+  const local = point.clone().applyMatrix4(object.matrix.clone().invert());
+  const padding = 0.2;
+  return (
+    Math.abs(local.x) <= 0.5 + padding / transform.scale[0]
+    && Math.abs(local.y) <= 0.5 + padding / transform.scale[1]
+    && Math.abs(local.z) <= 0.5 + padding / transform.scale[2]
+  );
+}
+
 function expectRouteFacingSupportEdgeIsFlush(
   support: {
     position: readonly [number, number, number];
@@ -53,8 +77,9 @@ describe('full-map decorative environments', () => {
   it('batches the Parallax architecture into a modest transform budget', () => {
     const rampIds = PARALLAX_MAP.ramps.map((ramp) => ramp.id);
     const transforms = buildParallaxEnvironment(PARALLAX_MAP);
-    expect(transforms).toHaveLength(114);
-    expect(transforms.length).toBeLessThanOrEqual(122);
+    expect(transforms).toHaveLength(66);
+    expect(transforms.length).toBeLessThanOrEqual(72);
+    expect(transforms.length / 114).toBeLessThan(0.6);
     expect(new Set(transforms.map((transform) => transform.material))).toEqual(
       new Set(['concrete', 'structure', 'glass', 'orange', 'blue']),
     );
@@ -177,7 +202,7 @@ describe('full-map decorative environments', () => {
     const transforms = buildDynamoRiseEnvironment(DYNAMO_RISE_MAP);
     const towers = transforms.filter((transform) => transform.role === 'tower');
 
-    expect(transforms).toHaveLength(53);
+    expect(transforms).toHaveLength(52);
     expect(transforms.length).toBeLessThanOrEqual(56);
     expect(DYNAMO_RISE_MAJOR_MASS_COUNT).toBe(20);
     expect(towers).toHaveLength(DYNAMO_RISE_MAJOR_MASS_COUNT);
@@ -190,6 +215,11 @@ describe('full-map decorative environments', () => {
     expect(new Set(transforms.map((transform) => transform.role))).toEqual(
       new Set(['tower', 'window-band', 'roof-crown', 'antenna', 'skybridge']),
     );
+    expect(transforms.some((transform) => (
+      transform.zone === 'crown'
+      && transform.role === 'roof-crown'
+      && transform.material === 'amber'
+    ))).toBe(false);
     expectFiniteTransforms(transforms);
     for (const tower of towers) {
       expect(tower.position[1] - tower.scale[1] / 2).toBeCloseTo(-92, 7);
@@ -206,10 +236,11 @@ describe('full-map decorative environments', () => {
     const macroMasses = transforms.filter((transform) => transform.composition === 'macro');
     const repeats = transforms.filter((transform) => transform.composition === 'repeat');
 
-    expect(transforms.length).toBeGreaterThanOrEqual(60);
+    expect(transforms).toHaveLength(48);
     expect(transforms.length).toBeLessThanOrEqual(SCRAPYARD_ENVIRONMENT_BUDGET);
-    expect(macroMasses.length).toBeLessThanOrEqual(44);
-    expect(repeats.length).toBeGreaterThanOrEqual(24);
+    expect(transforms.length / 89).toBeLessThan(0.6);
+    expect(macroMasses).toHaveLength(20);
+    expect(repeats).toHaveLength(28);
     expect(new Set(transforms.map((transform) => transform.geometry))).toEqual(
       new Set(['box', 'cylinder']),
     );
@@ -236,12 +267,9 @@ describe('full-map decorative environments', () => {
 
     const forkSeparators = transforms.filter((transform) => transform.role === 'separator');
     expect(forkSeparators).toHaveLength(3);
-    expect(Math.min(...forkSeparators.map((transform) => (
-      transform.position[2] - transform.scale[2] / 2
-    )))).toBeLessThanOrEqual(150);
-    expect(Math.max(...forkSeparators.map((transform) => (
-      transform.position[2] + transform.scale[2] / 2
-    )))).toBeGreaterThanOrEqual(780);
+    expect(forkSeparators.every((transform) => (
+      Math.abs(transform.position[0]) - transform.scale[0] / 2 >= 150
+    ))).toBe(true);
     expect(transforms.some((transform) => (
       transform.zone === 'upper-yard' && transform.role === 'crane'
     ))).toBe(true);
@@ -255,5 +283,32 @@ describe('full-map decorative environments', () => {
     // Dressing stays render-only and cannot add collider seams or mutate the
     // authored ramp list used by the surf and underside collision passes.
     expect(SWITCHYARD_MAP.ramps.map((ramp) => ramp.id)).toEqual(rampIds);
+  });
+
+  it('keeps every Scrapyard route corridor clear of decorative macro geometry', () => {
+    const transforms = buildScrapyardEnvironment();
+    const obstructions: string[] = [];
+    for (const ramp of SWITCHYARD_MAP.ramps) {
+      const basis = getRampBasis(ramp);
+      for (const lateralFraction of [-0.3, 0, 0.3]) {
+        for (const distanceFraction of [0.08, 0.25, 0.5, 0.75, 0.92]) {
+          const eye = rampSurfacePoint(
+            ramp,
+            ramp.width * lateralFraction,
+            basis.length * distanceFraction,
+          );
+          eye.y += SURF_TUNING.playerHeight;
+          transforms.forEach((transform, index) => {
+            if (containsPlayerEye(transform, eye)) {
+              obstructions.push(
+                `${ramp.id}@${lateralFraction},${distanceFraction}`
+                + ` -> ${transform.zone}/${transform.role}#${index}`,
+              );
+            }
+          });
+        }
+      }
+    }
+    expect(obstructions).toEqual([]);
   });
 });

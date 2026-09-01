@@ -144,7 +144,7 @@ const crownApproach = followingMapBank(crownTransfer, {
 });
 const landing = followingMapLanding(crownApproach, {
   id: 'map04-finish-crown', heading: 1.52, length: 112, profile: 'wide-catch',
-  gap: 20, entryDrop: 10, color: concrete, edgeColor: cyan,
+  gap: 20, entryDrop: 18, approachLateral: 18, color: concrete, edgeColor: cyan,
 });
 
 export const DYNAMO_RISE_SECTION_IDS = {
@@ -231,8 +231,6 @@ export const DYNAMO_RISE_MAP: SurfLevel = {
   ],
   goal: {
     rampId: landing.id,
-    position: mapEyePosition(landing, 0, 70),
-    radius: 11,
   },
   world: {
     kind: 'dynamo-rise-map',

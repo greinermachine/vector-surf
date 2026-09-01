@@ -10,7 +10,6 @@ import { SURF_LEVELS } from './levels';
 import {
   getRampBasis,
   heightOnRamp,
-  rampCoordinates,
   rampHeading,
   rampSurfacePoint,
 } from './ramp';
@@ -221,23 +220,20 @@ describe('authored level campaign', () => {
   );
 
   it.each(SURF_LEVELS.map((level) => [level.id, level] as const))(
-    '%s ends on a flat landing with a grounded goal',
+    '%s uses its entire final flat landing as the finish platform',
     (_id, level) => {
       const landing = level.ramps.at(-1)!;
       expect(landing.kind).toBe('landing');
       expect(landing.id).toBe(level.goal.rampId);
       expect(landing.bankRadians).toBe(0);
       expect(landing.startY).toBe(landing.endY);
-      const surface = sampleRampSurface(landing, level.goal.position.x, level.goal.position.z);
-      expect(surface).not.toBeNull();
-      expect(level.goal.position.y).toBeCloseTo(surface!.height + SURF_TUNING.playerHeight);
-      const goalDistance = rampCoordinates(
-        landing,
-        level.goal.position.x,
-        level.goal.position.z,
-      ).distance;
-      expect(goalDistance).toBeGreaterThan(36);
-      expect(getRampBasis(landing).length - goalDistance).toBeGreaterThan(16);
+      const length = getRampBasis(landing).length;
+      for (const lateral of [-landing.width * 0.45, 0, landing.width * 0.45]) {
+        for (const distance of [1, length / 2, length - 1]) {
+          const point = rampSurfacePoint(landing, lateral, distance);
+          expect(sampleRampSurface(landing, point.x, point.z)).not.toBeNull();
+        }
+      }
     },
   );
 
@@ -303,7 +299,7 @@ describe('authored level campaign', () => {
     expect(trainingLevels.slice(2).map((level) => (
       route(level).filter((group) => group.ramps.length === 2).length
     ))).toEqual([1, 2, 3, 3]);
-    expect(route(alpineFlow).filter((group) => group.ramps.length === 2)).toHaveLength(7);
+    expect(route(alpineFlow).filter((group) => group.ramps.length === 2)).toHaveLength(8);
     for (const fullMap of fullMaps) {
       const dualCount = route(fullMap).filter((group) => group.ramps.length === 2).length;
       expect(dualCount).toBeGreaterThanOrEqual(fullMap.id === 'switchyard' ? 0 : 3);

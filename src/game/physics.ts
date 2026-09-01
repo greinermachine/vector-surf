@@ -4,7 +4,6 @@ import {
   getRampBasis,
   heightOnRamp,
   isInsideRamp,
-  rampCoordinates,
 } from './ramp';
 import { rampShellThickness } from './rampProfiles';
 import type {
@@ -22,8 +21,10 @@ export type SurfSimulationScratch = {
   tangent: Vector3;
   turnDirection: Vector3;
   previousPosition: Vector3;
+  surfaceHitPosition: Vector3;
   surfaceNormal: Vector3;
   surfaceHeight: number;
+  surfaceHitTime: number;
 };
 
 function isFiniteVector(vector: Vector3) {
@@ -36,8 +37,10 @@ export function createSurfSimulationScratch(): SurfSimulationScratch {
     tangent: new Vector3(),
     turnDirection: new Vector3(),
     previousPosition: new Vector3(),
+    surfaceHitPosition: new Vector3(),
     surfaceNormal: new Vector3(),
     surfaceHeight: 0,
+    surfaceHitTime: 1,
   };
 }
 
@@ -287,6 +290,8 @@ function copyPlayerState(target: SurfPlayerState, source: SurfPlayerState) {
   target.contactRampId = source.contactRampId;
   target.contactGraceRemaining = source.contactGraceRemaining;
   target.landingContactTime = source.landingContactTime;
+  target.collisionKind = source.collisionKind;
+  target.collisionRampId = source.collisionRampId;
   target.resets = source.resets;
   target.complete = source.complete;
   target.elapsed = source.elapsed;
@@ -333,6 +338,8 @@ export function createSurfPlayer(
     contactRampId: ramp?.id,
     contactGraceRemaining: ramp ? SURF_TUNING.contactGraceTime : 0,
     landingContactTime: 0,
+    collisionKind: undefined,
+    collisionRampId: undefined,
     resets,
     complete: false,
     elapsed: 0,
@@ -479,7 +486,7 @@ function resolveRampUndersideCollision(
     if (time < 0 || time > 1 || time >= hitTime) continue;
     const x = previousPosition.x + (currentX - previousPosition.x) * time;
     const z = previousPosition.z + (currentZ - previousPosition.z) * time;
-    if (!isInsideRamp(ramp, x, z, 0)) continue;
+    if (!isInsideRamp(ramp, x, z, SURF_TUNING.playerRadius)) continue;
 
     hitRamp = ramp;
     hitTime = time;
@@ -502,6 +509,8 @@ function resolveRampUndersideCollision(
   state.contactNormal.set(0, 0, 0);
   state.contactGraceRemaining = 0;
   state.landingContactTime = 0;
+  state.collisionKind = 'underside-sweep';
+  state.collisionRampId = hitRamp.id;
   return true;
 }
 
@@ -515,6 +524,9 @@ function findContactCandidate(
   let bestRamp: RampDefinition | undefined;
   let bestHeight = 0;
   let bestScore = Number.POSITIVE_INFINITY;
+  let bestHitTime = 1;
+  let bestHitX = state.position.x;
+  let bestHitZ = state.position.z;
   let bestNormalX = 0;
   let bestNormalY = 0;
   let bestNormalZ = 0;
@@ -525,22 +537,76 @@ function findContactCandidate(
     SURF_TUNING.surfaceSweepPadding;
 
   for (const ramp of level.ramps) {
-    if (!isInsideRamp(ramp, state.position.x, state.position.z, SURF_TUNING.rampBoundsForgiveness)) {
-      continue;
-    }
     const basis = getRampBasis(ramp);
-    const height = heightOnRamp(ramp, state.position.x, state.position.z);
-    const targetY = height + SURF_TUNING.playerHeight;
-    const clearance = state.position.y - targetY;
-    if (clearance > SURF_TUNING.surfaceSnapDistance || clearance < -penetrationLimit) continue;
-
+    const enteredTopFootprint =
+      !isInsideRamp(ramp, previousPosition.x, previousPosition.z, 0)
+      && isInsideRamp(ramp, state.position.x, state.position.z, 0);
+    const approachPenetrationTolerance = enteredTopFootprint
+      ? SURF_TUNING.surfaceEdgeCatchDepth
+      : SURF_TUNING.surfacePenetrationTolerance;
     const previousHeight = heightOnRamp(ramp, previousPosition.x, previousPosition.z);
     const previousClearance = previousPosition.y - (previousHeight + SURF_TUNING.playerHeight);
+    const currentHeight = heightOnRamp(ramp, state.position.x, state.position.z);
+    const currentClearance = state.position.y
+      - (currentHeight + SURF_TUNING.playerHeight);
+    const clearanceTravel = currentClearance - previousClearance;
+    let hitTime = 1;
+    let hitX = state.position.x;
+    let hitZ = state.position.z;
+    let height = currentHeight;
+    let clearance = currentClearance;
+    let sweptTopHit = false;
+
+    // Sweep the player's feet against the analytic rideable plane. Testing the
+    // intersection footprint (rather than only the post-step footprint) keeps
+    // fast diagonal catches from crossing a ramp near an edge in one step.
+    if (
+      previousClearance >= -approachPenetrationTolerance
+      && previousClearance > 0
+      && currentClearance <= 0
+      && clearanceTravel < -1e-9
+    ) {
+      const time = previousClearance / -clearanceTravel;
+      const x = previousPosition.x
+        + (state.position.x - previousPosition.x) * time;
+      const z = previousPosition.z
+        + (state.position.z - previousPosition.z) * time;
+      if (
+        time >= 0
+        && time <= 1
+        && isInsideRamp(ramp, x, z, SURF_TUNING.rampBoundsForgiveness)
+      ) {
+        hitTime = time;
+        hitX = x;
+        hitZ = z;
+        height = heightOnRamp(ramp, x, z);
+        clearance = 0;
+        sweptTopHit = true;
+      }
+    }
+
+    if (!sweptTopHit) {
+      if (!isInsideRamp(
+        ramp,
+        state.position.x,
+        state.position.z,
+        SURF_TUNING.rampBoundsForgiveness,
+      )) {
+        continue;
+      }
+      if (
+        currentClearance > SURF_TUNING.surfaceSnapDistance
+        || currentClearance < -penetrationLimit
+      ) {
+        continue;
+      }
+    }
+
     // A surf catch must approach the top from on/above its plane. Previously,
     // a below-to-above crossing was accepted whenever the current clearance
     // happened to be positive, which let fast players tunnel through the
     // visible shell and snap onto the rideable side.
-    if (previousClearance < -SURF_TUNING.surfacePenetrationTolerance) continue;
+    if (previousClearance < -approachPenetrationTolerance) continue;
 
     const separationSpeed =
       state.velocity.x * basis.normalX +
@@ -553,11 +619,17 @@ function findContactCandidate(
     // route face only for that zero-width tie; either side of the ridge, the
     // asymmetric bounds test above leaves just the physically correct face.
     const dualRidgeTiePenalty = ramp.dual && !ramp.dual.preferred ? 0.01 : 0;
-    const score = Math.abs(clearance) + continuityPenalty + dualRidgeTiePenalty;
+    const score = hitTime * 100
+      + Math.abs(clearance)
+      + continuityPenalty
+      + dualRidgeTiePenalty;
     if (score >= bestScore) continue;
     bestRamp = ramp;
     bestHeight = height;
     bestScore = score;
+    bestHitTime = hitTime;
+    bestHitX = hitX;
+    bestHitZ = hitZ;
     bestNormalX = basis.normalX;
     bestNormalY = basis.normalY;
     bestNormalZ = basis.normalZ;
@@ -565,6 +637,12 @@ function findContactCandidate(
 
   if (bestRamp) {
     scratch.surfaceHeight = bestHeight;
+    scratch.surfaceHitTime = bestHitTime;
+    scratch.surfaceHitPosition.set(
+      bestHitX,
+      bestHeight + SURF_TUNING.playerHeight,
+      bestHitZ,
+    );
     scratch.surfaceNormal.set(bestNormalX, bestNormalY, bestNormalZ);
   }
   return bestRamp;
@@ -579,14 +657,33 @@ function resolveSurfaceContact(
 ) {
   const contact = findContactCandidate(state, level, previousPosition, delta, scratch);
   if (contact) {
-    state.position.y = scratch.surfaceHeight + SURF_TUNING.playerHeight;
+    state.position.copy(scratch.surfaceHitPosition);
     clipVelocityInPlace(state.velocity, scratch.surfaceNormal);
+    if (scratch.surfaceHitTime < 1) {
+      const remainingDelta = delta * (1 - scratch.surfaceHitTime);
+      const nextX = state.position.x + state.velocity.x * remainingDelta;
+      const nextZ = state.position.z + state.velocity.z * remainingDelta;
+      if (isInsideRamp(
+        contact,
+        nextX,
+        nextZ,
+        SURF_TUNING.rampBoundsForgiveness,
+      )) {
+        state.position.set(
+          nextX,
+          heightOnRamp(contact, nextX, nextZ) + SURF_TUNING.playerHeight,
+          nextZ,
+        );
+      }
+    }
     state.contactNormal.copy(scratch.surfaceNormal);
     state.contactState = 'ramp';
     state.contactRampId = contact.id;
     state.contactGraceRemaining = SURF_TUNING.contactGraceTime;
+    state.collisionKind = scratch.surfaceHitTime < 1 ? 'top-sweep' : 'top-contact';
+    state.collisionRampId = contact.id;
     if (contact.kind === 'bank') state.surfingStarted = true;
-    return;
+    return true;
   }
 
   const previousRamp = state.contactRampId
@@ -619,7 +716,7 @@ function resolveSurfaceContact(
         state.contactNormal.copy(scratch.surfaceNormal);
         state.contactState = 'grace';
         state.contactGraceRemaining = Math.max(0, state.contactGraceRemaining - delta);
-        return;
+        return true;
       }
     }
   }
@@ -628,28 +725,212 @@ function resolveSurfaceContact(
   state.contactNormal.set(0, 0, 0);
   state.contactGraceRemaining = Math.max(0, state.contactGraceRemaining - delta);
   if (state.contactGraceRemaining === 0) state.contactRampId = undefined;
+  return false;
 }
 
-function routeReferenceHeight(level: SurfLevel, position: Vector3) {
-  let nearestDistanceSquared = Number.POSITIVE_INFINITY;
-  let referenceHeight = level.spawn.position.y;
+/**
+ * Sweep the player's horizontal capsule footprint against the four vertical
+ * walls of every shallow ramp shell. The top and underside remain analytic
+ * plane contacts; this pass closes the outer sides and start/end caps so the
+ * physical body matches the watertight mesh rendered by `makeSkirtGeometry`.
+ */
+function resolveRampSideCollision(
+  state: SurfPlayerState,
+  level: SurfLevel,
+  previousPosition: Vector3,
+  scratch: SurfSimulationScratch,
+) {
+  let bestTime = Number.POSITIVE_INFINITY;
+  let bestX = 0;
+  let bestY = 0;
+  let bestZ = 0;
+  let bestNormalX = 0;
+  let bestNormalZ = 0;
+  let bestRampId: string | undefined;
+  let bestHitAxis: 'lateral' | 'distance' = 'lateral';
+  const radius = SURF_TUNING.playerRadius;
+
   for (const ramp of level.ramps) {
     const basis = getRampBasis(ramp);
-    const coordinates = rampCoordinates(ramp, position.x, position.z);
-    const clampedLateral = Math.max(-ramp.width / 2, Math.min(ramp.width / 2, coordinates.lateral));
-    const clampedDistance = Math.max(0, Math.min(basis.length, coordinates.distance));
-    const lateralMiss = coordinates.lateral - clampedLateral;
-    const forwardMiss = coordinates.distance - clampedDistance;
-    const distanceSquared = lateralMiss ** 2 + forwardMiss ** 2;
-    if (distanceSquared >= nearestDistanceSquared) continue;
-    nearestDistanceSquared = distanceSquared;
-    referenceHeight =
-      ramp.startY +
-      basis.forwardSlope * clampedDistance +
-      basis.lateralSlope * clampedLateral +
-      SURF_TUNING.playerHeight;
+    const previousOffsetX = previousPosition.x - ramp.start[0];
+    const previousOffsetZ = previousPosition.z - ramp.start[1];
+    const currentOffsetX = state.position.x - ramp.start[0];
+    const currentOffsetZ = state.position.z - ramp.start[1];
+    const previousLateral = previousOffsetX * basis.rightX
+      + previousOffsetZ * basis.rightZ;
+    const currentLateral = currentOffsetX * basis.rightX
+      + currentOffsetZ * basis.rightZ;
+    const previousDistance = previousOffsetX * basis.forwardX
+      + previousOffsetZ * basis.forwardZ;
+    const currentDistance = currentOffsetX * basis.forwardX
+      + currentOffsetZ * basis.forwardZ;
+
+    // Dual faces share an open ridge. Expand only exposed outer edges by the
+    // player's radius so the ridge never becomes an invisible internal wall.
+    const minimumLateral = -ramp.width / 2
+      - (ramp.dual?.face === 'right' ? 0 : radius);
+    const maximumLateral = ramp.width / 2
+      + (ramp.dual?.face === 'left' ? 0 : radius);
+    const minimumDistance = -radius;
+    const maximumDistance = basis.length + radius;
+    const previousInside =
+      previousLateral >= minimumLateral
+      && previousLateral <= maximumLateral
+      && previousDistance >= minimumDistance
+      && previousDistance <= maximumDistance;
+    if (previousInside) continue;
+
+    let enterTime = 0;
+    let exitTime = 1;
+    let hitAxis: 'lateral' | 'distance' = 'lateral';
+    let hitNormalSign = 0;
+    let intersects = true;
+
+    const lateralTravel = currentLateral - previousLateral;
+    if (Math.abs(lateralTravel) < 1e-10) {
+      if (previousLateral < minimumLateral || previousLateral > maximumLateral) {
+        intersects = false;
+      }
+    } else {
+      const first = (minimumLateral - previousLateral) / lateralTravel;
+      const second = (maximumLateral - previousLateral) / lateralTravel;
+      const near = Math.min(first, second);
+      const far = Math.max(first, second);
+      if (near > enterTime) {
+        enterTime = near;
+        hitAxis = 'lateral';
+        hitNormalSign = lateralTravel > 0 ? -1 : 1;
+      }
+      exitTime = Math.min(exitTime, far);
+      if (enterTime > exitTime) intersects = false;
+    }
+
+    const distanceTravel = currentDistance - previousDistance;
+    if (intersects && Math.abs(distanceTravel) < 1e-10) {
+      if (previousDistance < minimumDistance || previousDistance > maximumDistance) {
+        intersects = false;
+      }
+    } else if (intersects) {
+      const first = (minimumDistance - previousDistance) / distanceTravel;
+      const second = (maximumDistance - previousDistance) / distanceTravel;
+      const near = Math.min(first, second);
+      const far = Math.max(first, second);
+      if (near > enterTime) {
+        enterTime = near;
+        hitAxis = 'distance';
+        hitNormalSign = distanceTravel > 0 ? -1 : 1;
+      }
+      exitTime = Math.min(exitTime, far);
+      if (enterTime > exitTime) intersects = false;
+    }
+
+    if (
+      !intersects
+      || enterTime < 0
+      || enterTime > 1
+      || enterTime >= bestTime
+      || hitNormalSign === 0
+    ) {
+      continue;
+    }
+    if (
+      hitAxis === 'lateral'
+      && (
+        (ramp.dual?.face === 'left' && hitNormalSign > 0)
+        || (ramp.dual?.face === 'right' && hitNormalSign < 0)
+      )
+    ) {
+      continue;
+    }
+
+    const x = previousPosition.x
+      + (state.position.x - previousPosition.x) * enterTime;
+    const y = previousPosition.y
+      + (state.position.y - previousPosition.y) * enterTime;
+    const z = previousPosition.z
+      + (state.position.z - previousPosition.z) * enterTime;
+    const top = heightOnRamp(ramp, x, z);
+    const bottom = top - rampShellThickness(ramp);
+    const feet = y - SURF_TUNING.playerHeight;
+    // Crossing a cap at the top lip is still a valid approach to the rideable
+    // face. Let the analytic top sweep own that narrow band; only a body that
+    // is clearly below the plane is stopped by the vertical end wall.
+    if (
+      hitAxis === 'distance'
+      && feet >= top - SURF_TUNING.surfaceEdgeCatchDepth
+    ) {
+      continue;
+    }
+    if (
+      feet > top + SURF_TUNING.surfaceSweepPadding
+      || y < bottom - SURF_TUNING.surfaceSweepPadding
+    ) {
+      continue;
+    }
+
+    bestTime = enterTime;
+    bestX = x;
+    bestY = y;
+    bestZ = z;
+    bestRampId = ramp.id;
+    bestHitAxis = hitAxis;
+    if (hitAxis === 'lateral') {
+      bestNormalX = basis.rightX * hitNormalSign;
+      bestNormalZ = basis.rightZ * hitNormalSign;
+    } else {
+      bestNormalX = basis.forwardX * hitNormalSign;
+      bestNormalZ = basis.forwardZ * hitNormalSign;
+    }
   }
-  return referenceHeight;
+
+  if (!Number.isFinite(bestTime)) return false;
+  scratch.surfaceNormal.set(bestNormalX, 0, bestNormalZ).normalize();
+  state.position.set(bestX, bestY, bestZ).addScaledVector(
+    scratch.surfaceNormal,
+    SURF_TUNING.rampSideCollisionPadding,
+  );
+  clipVelocityInPlace(state.velocity, scratch.surfaceNormal);
+  state.contactState = 'air';
+  state.contactRampId = undefined;
+  state.contactNormal.set(0, 0, 0);
+  state.contactGraceRemaining = 0;
+  state.landingContactTime = 0;
+  state.collisionKind = bestHitAxis === 'lateral' ? 'side-sweep' : 'end-cap-sweep';
+  state.collisionRampId = bestRampId;
+  return true;
+}
+
+const failureVolumeHeights = new WeakMap<SurfLevel, number>();
+
+/**
+ * One broad failure plane below the complete authored map.
+ *
+ * The former nearest-ramp threshold moved up and down with route geometry,
+ * effectively creating invisible barriers beneath otherwise valid air lines.
+ * A single floor cannot police shortcuts: it only catches a player after they
+ * have fallen below every physical ramp shell in the level.
+ */
+export function failureVolumeHeight(level: SurfLevel) {
+  const cached = failureVolumeHeights.get(level);
+  if (cached !== undefined) return cached;
+
+  let lowestShellPoint = Number.POSITIVE_INFINITY;
+  for (const ramp of level.ramps) {
+    const basis = getRampBasis(ramp);
+    const lowestTopPoint = Math.min(ramp.startY, ramp.endY)
+      - Math.abs(basis.lateralSlope) * ramp.width / 2;
+    lowestShellPoint = Math.min(
+      lowestShellPoint,
+      lowestTopPoint - rampShellThickness(ramp),
+    );
+  }
+  const depth = level.world?.resetDropDistance ?? SURF_TUNING.resetDropDistance;
+  const height = Math.min(
+    SURF_TUNING.resetHeight,
+    lowestShellPoint - Math.max(0, depth),
+  );
+  failureVolumeHeights.set(level, height);
+  return height;
 }
 
 function resetPlayerInPlace(state: SurfPlayerState, level: SurfLevel) {
@@ -689,6 +970,8 @@ function stepSurfPlayerInPlace(
   }
 
   state.elapsed += delta;
+  state.collisionKind = undefined;
+  state.collisionRampId = undefined;
   scratch.previousPosition.copy(state.position);
 
   const contactRamp = state.contactRampId
@@ -815,11 +1098,26 @@ function stepSurfPlayerInPlace(
     scratch,
   );
   if (!hitRampUnderside) {
-    resolveSurfaceContact(state, level, scratch.previousPosition, delta, scratch);
+    const hitRideableSurface = resolveSurfaceContact(
+      state,
+      level,
+      scratch.previousPosition,
+      delta,
+      scratch,
+    );
+    if (!hitRideableSurface) {
+      resolveRampSideCollision(state, level, scratch.previousPosition, scratch);
+    }
   }
 
-  const settledOnLanding =
-    state.contactState === 'ramp' && state.contactRampId === level.goal.rampId;
+  const goalRamp = level.ramps.find((ramp) => ramp.id === level.goal.rampId);
+  const settledOnLanding = Boolean(
+    goalRamp
+    && goalRamp.kind === 'landing'
+    && state.contactState === 'ramp'
+    && state.contactRampId === goalRamp.id
+    && isInsideRamp(goalRamp, state.position.x, state.position.z, 0),
+  );
   if (settledOnLanding) {
     state.landingContactTime += delta;
     state.velocity.multiplyScalar(Math.exp(-SURF_TUNING.landingDrag * delta));
@@ -829,24 +1127,7 @@ function stepSurfPlayerInPlace(
 
   const speed = state.velocity.length();
   state.peakSpeed = Math.max(state.peakSpeed, speed);
-  const goalRamp = level.ramps.find((ramp) => ramp.id === level.goal.rampId);
-  const playerGoalCoordinates = goalRamp
-    ? rampCoordinates(goalRamp, state.position.x, state.position.z)
-    : undefined;
-  const goalCoordinates = goalRamp
-    ? rampCoordinates(goalRamp, level.goal.position.x, level.goal.position.z)
-    : undefined;
-  const transverseDistance = playerGoalCoordinates && goalCoordinates
-    ? Math.hypot(
-        playerGoalCoordinates.lateral - goalCoordinates.lateral,
-        state.position.y - level.goal.position.y,
-      )
-    : Number.POSITIVE_INFINITY;
   if (
-    playerGoalCoordinates &&
-    goalCoordinates &&
-    playerGoalCoordinates.distance >= goalCoordinates.distance - SURF_TUNING.goalPadding &&
-    transverseDistance <= level.goal.radius + SURF_TUNING.goalPadding &&
     settledOnLanding &&
     state.landingContactTime >= SURF_TUNING.minimumLandingContactTime
   ) {
@@ -854,14 +1135,10 @@ function stepSurfPlayerInPlace(
     return;
   }
 
-  const referenceHeight = routeReferenceHeight(level, state.position);
-  const resetDropDistance =
-    level.world?.resetDropDistance ?? SURF_TUNING.resetDropDistance;
   if (
     !isFiniteVector(state.position) ||
     !isFiniteVector(state.velocity) ||
-    state.position.y < SURF_TUNING.resetHeight ||
-    state.position.y < referenceHeight - resetDropDistance
+    state.position.y < failureVolumeHeight(level)
   ) {
     resetPlayerInPlace(state, level);
   }

@@ -2,6 +2,12 @@ import type { Vector3 } from 'three';
 
 export type SurfContactState = 'air' | 'grace' | 'ramp';
 export type SurfMovementState = 'AIR' | 'SURF_RAMP' | 'GROUND';
+export type SurfCollisionKind =
+  | 'top-contact'
+  | 'top-sweep'
+  | 'underside-sweep'
+  | 'side-sweep'
+  | 'end-cap-sweep';
 
 export type DualRampFace = 'left' | 'right';
 
@@ -97,8 +103,6 @@ export type SurfLevel = {
   routeLinks?: readonly SurfRouteLink[];
   goal: {
     rampId: string;
-    position: Vector3;
-    radius: number;
   };
   world?: SurfWorldSettings;
 };
@@ -116,6 +120,8 @@ export type SurfPlayerState = {
   contactRampId?: string;
   contactGraceRemaining: number;
   landingContactTime: number;
+  collisionKind?: SurfCollisionKind;
+  collisionRampId?: string;
   resets: number;
   complete: boolean;
   elapsed: number;
@@ -144,6 +150,8 @@ export type SurfTelemetry = {
   contactRampId?: string;
   rampFace: 'LEFT' | 'RIGHT' | null;
   recommendedStrafe: 'A' | 'D' | null;
+  collisionKind?: SurfCollisionKind;
+  collisionRampId?: string;
   resets: number;
 };
 

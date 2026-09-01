@@ -54,6 +54,8 @@ function initialTelemetry(level: SurfLevel): SurfTelemetry {
     contactRampId: level.ramps[0]?.id,
     rampFace: null,
     recommendedStrafe: null,
+    collisionKind: undefined,
+    collisionRampId: undefined,
     resets: 0,
   };
 }
@@ -294,6 +296,7 @@ export function SurfGame({
           <span>STATE <b>{telemetry.movementState}</b></span>
           <span>RAMP <b>{telemetry.contactRampId ?? '—'}</b></span>
           <span>FACE <b>{telemetry.rampFace ?? '—'}</b></span>
+          <span>SWEEP <b>{telemetry.collisionKind ?? '—'} / {telemetry.collisionRampId ?? '—'}</b></span>
           <span>NORMAL <b>{telemetry.surfaceNormal.map((value) => value.toFixed(2)).join(' / ')}</b></span>
           <span>TANGENT <b>{telemetry.tangentVelocity.map((value) => value.toFixed(1)).join(' / ')}</b></span>
           <span>LINE <b>{telemetry.wishDirection.map((value) => value.toFixed(2)).join(' / ')}</b></span>
@@ -613,6 +616,8 @@ function SurfController({
         contactRampId: current.contactRampId,
         rampFace,
         recommendedStrafe,
+        collisionKind: current.collisionKind,
+        collisionRampId: current.collisionRampId,
         resets: current.resets,
       });
     }

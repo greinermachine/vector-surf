@@ -60,10 +60,6 @@ describe('dual-sided surf ramp primitive', () => {
     ramps: dual.faces,
     goal: {
       rampId: dual.right.id,
-      position: rampSurfacePoint(dual.right, 0, 82).add(
-        new Vector3(0, SURF_TUNING.playerHeight, 0),
-      ),
-      radius: 3,
     },
   });
 

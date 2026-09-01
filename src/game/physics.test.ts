@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { SURF_TUNING } from './config';
 import { createDualSurfRamp } from './dualRamp';
 import {
+  finishPlatformRamp,
+  finishPlatformPoint,
   primaryRouteRamp,
   rampRouteGroups,
   routeGroupIndexForRamp,
@@ -31,6 +33,7 @@ import {
   computeCameraRight,
   computeWishDirection,
   createSurfPlayer,
+  failureVolumeHeight,
   isRampAttachmentHeld,
   movementStateFor,
   projectCameraDirectionOntoRamp,
@@ -138,7 +141,9 @@ function scriptedRide(
     const next = nextGroup ? selectedRamp(nextGroup) : undefined;
     const basis = getRampBasis(current);
     const coordinates = rampCoordinates(current, state.position.x, state.position.z);
-    const exitHeightFraction = Math.min(0.345, 0.22 + level.difficulty * 0.025);
+    const exitHeightFraction = current.id === 'map04-signature-tower-catch'
+      ? 0.12
+      : Math.min(0.345, 0.22 + level.difficulty * 0.025);
     const highSide = Math.sign(current.bankRadians) * current.width * exitHeightFraction;
     rampSurfacePoint(
       current,
@@ -164,11 +169,16 @@ function scriptedRide(
       rampSurfacePoint(
         next,
         nextHighSide,
-        Math.min(13, getRampBasis(next).length),
+        next.id === 'map04-neighbor-descent'
+          || next.dual?.id === 'map04-final-rise-two-dual'
+          ? Math.min(72, getRampBasis(next).length)
+          : Math.min(13, getRampBasis(next).length),
         nextAim,
       );
     } else {
-      nextAim.copy(level.goal.position);
+      finishPlatformPoint(level, nextAim).add(
+        new Vector3(0, SURF_TUNING.playerHeight, 0),
+      );
     }
 
     // Finish the attached line on the high half of the current face. Once
@@ -229,6 +239,22 @@ function scriptedRide(
     );
     state = advanced.state;
     accumulator = advanced.accumulator;
+    if (
+      state.collisionKind === 'underside-sweep'
+      || state.collisionKind === 'side-sweep'
+      || state.collisionKind === 'end-cap-sweep'
+    ) {
+      const collisionRamp = level.ramps.find((ramp) => ramp.id === state.collisionRampId);
+      const collisionClearance = collisionRamp
+        ? state.position.y - SURF_TUNING.playerHeight
+          - heightOnRamp(collisionRamp, state.position.x, state.position.z)
+        : Number.NaN;
+      events.push(
+        `${frame}:${state.collisionKind}-${state.collisionRampId ?? 'unknown'}`
+        + `@${state.position.x.toFixed(1)},${state.position.y.toFixed(1)},${state.position.z.toFixed(1)}`
+        + ` feet=${collisionClearance.toFixed(2)}`,
+      );
+    }
     if (next) {
       const nextBasis = getRampBasis(next);
       const nextCoordinates = rampCoordinates(next, state.position.x, state.position.z);
@@ -347,10 +373,6 @@ function undersideTestLevel(ramps = [UNDERSIDE_TEST_RAMP]): SurfLevel {
     ramps,
     goal: {
       rampId: spawnRamp.id,
-      position: rampSurfacePoint(spawnRamp, 0, 72).add(
-        new Vector3(0, SURF_TUNING.playerHeight, 0),
-      ),
-      radius: 4,
     },
     world: {
       kind: 'dynamo-rise-map',
@@ -458,7 +480,7 @@ describe('standalone surf physics', () => {
     const outside = airborneBelowRamp(
       level,
       UNDERSIDE_TEST_RAMP,
-      UNDERSIDE_TEST_RAMP.width / 2 + 0.2,
+      UNDERSIDE_TEST_RAMP.width / 2 + SURF_TUNING.playerRadius + 0.2,
       39,
       0.9,
       diagonalVelocity,
@@ -526,6 +548,122 @@ describe('standalone surf physics', () => {
     );
   });
 
+  it.each([
+    ['30 Hz', 1 / 30],
+    ['60 Hz', 1 / 60],
+    ['120 Hz', 1 / 120],
+  ] as const)('sweeps a high-speed top catch at %s', (_label, delta) => {
+    const level = undersideTestLevel();
+    const surface = rampSurfacePoint(UNDERSIDE_TEST_RAMP, 0, 40);
+    const state = createSurfPlayer(level);
+    state.position.copy(surface).add(
+      new Vector3(0, SURF_TUNING.playerHeight + 1.35, 0),
+    );
+    state.velocity.set(0, -300, 0);
+    state.contactState = 'air';
+    state.contactRampId = undefined;
+    state.contactGraceRemaining = 0;
+    state.surfingStarted = true;
+
+    const result = stepSurfPlayer(state, input(), level, delta);
+    expect(result.contactState).toBe('ramp');
+    expect(result.contactRampId).toBe(UNDERSIDE_TEST_RAMP.id);
+    expect(result.collisionKind).toBe('top-sweep');
+  });
+
+  it.each([
+    ['30 Hz', 1 / 30],
+    ['60 Hz', 1 / 60],
+    ['120 Hz', 1 / 120],
+  ] as const)('sweeps a high-speed exposed side at %s', (_label, delta) => {
+    const level = undersideTestLevel();
+    const ramp = UNDERSIDE_TEST_RAMP;
+    const basis = getRampBasis(ramp);
+    const start = rampSurfacePoint(
+      ramp,
+      ramp.width / 2 + SURF_TUNING.playerRadius + 1.2,
+      basis.length / 2,
+    );
+    const state = createSurfPlayer(level);
+    state.position.set(
+      start.x,
+      heightOnRamp(ramp, start.x, start.z) - rampShellThickness(ramp) / 2,
+      start.z,
+    );
+    state.velocity.set(-basis.rightX * 300, 0, -basis.rightZ * 300);
+    state.contactState = 'air';
+    state.contactRampId = undefined;
+    state.contactGraceRemaining = 0;
+    state.surfingStarted = true;
+
+    const result = stepSurfPlayer(state, input(), level, delta);
+    expect(result.collisionKind).toBe('side-sweep');
+    expect(result.collisionRampId).toBe(ramp.id);
+    expect(rampCoordinates(ramp, result.position.x, result.position.z).lateral)
+      .toBeGreaterThan(ramp.width / 2 + SURF_TUNING.playerRadius);
+  });
+
+  it.each([
+    ['30 Hz', 1 / 30],
+    ['60 Hz', 1 / 60],
+    ['120 Hz', 1 / 120],
+  ] as const)('sweeps a high-speed exposed end cap at %s', (_label, delta) => {
+    const level = undersideTestLevel();
+    const ramp = UNDERSIDE_TEST_RAMP;
+    const basis = getRampBasis(ramp);
+    const start = rampSurfacePoint(
+      ramp,
+      0,
+      -SURF_TUNING.playerRadius - 1.2,
+    );
+    const state = createSurfPlayer(level);
+    state.position.set(
+      start.x,
+      heightOnRamp(ramp, start.x, start.z) - rampShellThickness(ramp) / 2,
+      start.z,
+    );
+    state.velocity.set(basis.forwardX * 300, 0, basis.forwardZ * 300);
+    state.contactState = 'air';
+    state.contactRampId = undefined;
+    state.contactGraceRemaining = 0;
+    state.surfingStarted = true;
+
+    const result = stepSurfPlayer(state, input(), level, delta);
+    expect(result.collisionKind).toBe('end-cap-sweep');
+    expect(result.collisionRampId).toBe(ramp.id);
+    expect(rampCoordinates(ramp, result.position.x, result.position.z).distance)
+      .toBeLessThan(-SURF_TUNING.playerRadius);
+  });
+
+  it.each([
+    ['30 Hz', 1 / 30],
+    ['60 Hz', 1 / 60],
+    ['120 Hz', 1 / 120],
+  ] as const)('keeps the end-cap lip rideable from above at %s', (_label, delta) => {
+    const level = undersideTestLevel();
+    const ramp = UNDERSIDE_TEST_RAMP;
+    const basis = getRampBasis(ramp);
+    const start = rampSurfacePoint(
+      ramp,
+      0,
+      -SURF_TUNING.playerRadius - 1,
+    );
+    const state = createSurfPlayer(level);
+    state.position.copy(start).add(
+      new Vector3(0, SURF_TUNING.playerHeight + 0.25, 0),
+    );
+    state.velocity.set(basis.forwardX * 300, -120, basis.forwardZ * 300);
+    state.contactState = 'air';
+    state.contactRampId = undefined;
+    state.contactGraceRemaining = 0;
+    state.surfingStarted = true;
+
+    const result = stepSurfPlayer(state, input(), level, delta);
+    expect(result.contactState).toBe('ramp');
+    expect(result.contactRampId).toBe(ramp.id);
+    expect(result.collisionKind).toBe('top-sweep');
+  });
+
   it.each(SWITCHYARD_MAP.ramps.map((ramp) => [ramp.id, ramp] as const))(
     'keeps the Scrapyard underside solid on %s',
     (_rampId, ramp) => {
@@ -547,6 +685,185 @@ describe('standalone surf physics', () => {
       expectUndersideBlock(result, ramp);
     },
   );
+
+  it.each(FULL_MAPS.map((level) => [level.id, level] as const))(
+    '%s completes after stable contact across the whole final platform and nowhere else',
+    (_levelId, level) => {
+      const landing = finishPlatformRamp(level);
+      const basis = getRampBasis(landing);
+      const landingNormal = new Vector3(basis.normalX, basis.normalY, basis.normalZ);
+      const requiredSteps = Math.ceil(
+        SURF_TUNING.minimumLandingContactTime / SURF_TUNING.fixedStep,
+      ) + 1;
+
+      for (const lateral of [-landing.width * 0.4, 0, landing.width * 0.4]) {
+        for (const distance of [2, basis.length / 2, basis.length - 2]) {
+          let state = createSurfPlayer(level);
+          state.position.copy(rampSurfacePoint(landing, lateral, distance)).add(
+            new Vector3(0, SURF_TUNING.playerHeight, 0),
+          );
+          state.velocity.set(0, 0, 0);
+          state.contactState = 'ramp';
+          state.contactRampId = landing.id;
+          state.contactNormal.copy(landingNormal);
+          state.contactGraceRemaining = SURF_TUNING.contactGraceTime;
+          state.surfingStarted = true;
+          for (let step = 0; step < requiredSteps; step += 1) {
+            state = stepSurfPlayer(state, input(), level, SURF_TUNING.fixedStep);
+          }
+          expect(
+            state.complete,
+            `${level.id} landing local ${lateral.toFixed(1)},${distance.toFixed(1)}`,
+          ).toBe(true);
+        }
+      }
+
+      const nonGoal = level.ramps.find((ramp) => ramp.kind === 'bank')!;
+      let nonGoalState = createSurfPlayer(level);
+      const nonGoalBasis = getRampBasis(nonGoal);
+      nonGoalState.position.copy(
+        rampSurfacePoint(nonGoal, 0, nonGoalBasis.length / 2),
+      ).add(new Vector3(0, SURF_TUNING.playerHeight, 0));
+      nonGoalState.velocity.set(0, 0, 0);
+      nonGoalState.contactState = 'ramp';
+      nonGoalState.contactRampId = nonGoal.id;
+      nonGoalState.contactNormal.set(
+        nonGoalBasis.normalX,
+        nonGoalBasis.normalY,
+        nonGoalBasis.normalZ,
+      );
+      nonGoalState.contactGraceRemaining = SURF_TUNING.contactGraceTime;
+      nonGoalState.landingContactTime = SURF_TUNING.minimumLandingContactTime;
+      nonGoalState.surfingStarted = true;
+      nonGoalState = stepSurfPlayer(
+        nonGoalState,
+        input(),
+        level,
+        SURF_TUNING.fixedStep,
+      );
+      expect(nonGoalState.complete).toBe(false);
+      expect(nonGoalState.landingContactTime).toBe(0);
+
+      let underside = airborneBelowRamp(
+        level,
+        landing,
+        0,
+        basis.length / 2,
+        0.3,
+        new Vector3(0, 140, 0),
+      );
+      underside.landingContactTime = SURF_TUNING.minimumLandingContactTime;
+      underside = stepSurfPlayer(underside, input(), level, SURF_TUNING.fixedStep);
+      expect(underside.complete).toBe(false);
+      expect(underside.collisionKind).toBe('underside-sweep');
+      expect(underside.landingContactTime).toBe(0);
+
+      const sideStart = rampSurfacePoint(
+        landing,
+        landing.width / 2 + SURF_TUNING.playerRadius + 1,
+        basis.length / 2,
+      );
+      let side = createSurfPlayer(level);
+      side.position.set(
+        sideStart.x,
+        heightOnRamp(landing, sideStart.x, sideStart.z) - rampShellThickness(landing) / 2,
+        sideStart.z,
+      );
+      side.velocity.set(-basis.rightX * 240, 0, -basis.rightZ * 240);
+      side.contactState = 'air';
+      side.contactRampId = undefined;
+      side.contactGraceRemaining = 0;
+      side.landingContactTime = SURF_TUNING.minimumLandingContactTime;
+      side.surfingStarted = true;
+      side = stepSurfPlayer(side, input(), level, SURF_TUNING.fixedStep);
+      expect(side.complete).toBe(false);
+      expect(side.collisionKind).toBe('side-sweep');
+      expect(side.landingContactTime).toBe(0);
+    },
+  );
+
+  it.each([24, 60, 120])(
+    'accepts the Alpine ravine dual catch from either face at speed %i',
+    (speed) => {
+      const level = FULL_MAPS.find((candidate) => candidate.id === 'alpine-flow')!;
+      const faces = level.ramps.filter((ramp) => ramp.dual?.id === 'map01-s2-a-wedge');
+      expect(faces).toHaveLength(2);
+      for (const face of faces) {
+        const basis = getRampBasis(face);
+        const normal = new Vector3(basis.normalX, basis.normalY, basis.normalZ);
+        const tangent = new Vector3(
+          basis.forwardX,
+          basis.forwardSlope,
+          basis.forwardZ,
+        ).normalize();
+        const state = createSurfPlayer(level);
+        state.position.copy(rampSurfacePoint(face, 0, 18)).add(
+          new Vector3(0, SURF_TUNING.playerHeight + 0.04, 0),
+        );
+        state.velocity.copy(tangent).multiplyScalar(speed).addScaledVector(normal, -3);
+        state.contactState = 'air';
+        state.contactRampId = undefined;
+        state.contactGraceRemaining = 0;
+        state.surfingStarted = true;
+        const result = stepSurfPlayer(state, input(), level, SURF_TUNING.fixedStep);
+        expect(result.contactState, face.id).toBe('ramp');
+        expect(result.contactRampId, face.id).toBe(face.id);
+        expect(result.collisionKind, face.id).not.toBe('side-sweep');
+      }
+    },
+  );
+
+  it('allows a momentum-built Alpine ravine skip to bypass a route face and catch later geometry', () => {
+    const level = FULL_MAPS.find((candidate) => candidate.id === 'alpine-flow')!;
+    const source = level.ramps.find((ramp) => ramp.id === 'map01-ridge-transition')!;
+    const target = level.ramps.find((ramp) => (
+      ramp.dual?.id === 'map01-s2-b-wedge' && ramp.dual.preferred
+    ))!;
+    const sourceBasis = getRampBasis(source);
+    const start = rampSurfacePoint(
+      source,
+      Math.sign(source.bankRadians) * source.width * 0.3,
+      sourceBasis.length + 1,
+    ).add(new Vector3(0, SURF_TUNING.playerHeight + 0.4, 0));
+    const destination = rampSurfacePoint(target, 0, 18).add(
+      new Vector3(0, SURF_TUNING.playerHeight, 0),
+    );
+    const flightSteps = 480;
+    const flightTime = flightSteps * SURF_TUNING.fixedStep;
+    const velocity = destination.clone().sub(start).multiplyScalar(1 / flightTime);
+    velocity.y = (
+      destination.y
+      - start.y
+      + SURF_TUNING.gravity
+        * SURF_TUNING.fixedStep ** 2
+        * flightSteps
+        * (flightSteps + 1)
+        / 2
+    ) / flightTime;
+
+    let state = createSurfPlayer(level);
+    state.position.copy(start);
+    state.velocity.copy(velocity);
+    state.yaw = Math.atan2(velocity.x, velocity.z);
+    state.contactState = 'air';
+    state.contactRampId = undefined;
+    state.contactNormal.set(0, 0, 0);
+    state.contactGraceRemaining = 0;
+    state.surfingStarted = true;
+    const contacted: string[] = [];
+    for (let step = 0; step <= flightSteps && state.contactRampId !== target.id; step += 1) {
+      state = stepSurfPlayer(state, input(), level, SURF_TUNING.fixedStep);
+      if (state.contactRampId && !contacted.includes(state.contactRampId)) {
+        contacted.push(state.contactRampId);
+      }
+    }
+
+    expect(state.resets, JSON.stringify({ contacted, position: state.position.toArray() }))
+      .toBe(0);
+    expect(contacted.some((id) => id.startsWith('map01-s2-a-wedge'))).toBe(false);
+    expect(state.contactRampId, JSON.stringify({ contacted, position: state.position.toArray() }))
+      .toBe(target.id);
+  });
 
   it('uses only camera-relative lateral wish for A and D', () => {
     expect(computeWishDirection(0, -1).x).toBeCloseTo(1);
@@ -923,7 +1240,9 @@ describe('standalone surf physics', () => {
       const state = createSurfPlayer(level);
       state.elapsed = 31.25;
       state.peakSpeed = 87;
-      state.position.copy(level.goal.position);
+      state.position.copy(finishPlatformPoint(level)).add(
+        new Vector3(0, SURF_TUNING.playerHeight, 0),
+      );
       state.velocity.set(20, -4, 61);
       const restored = resetSurfPlayer(state, level);
       expect(restored.position.distanceTo(level.spawn.position)).toBeLessThan(1e-8);
@@ -934,7 +1253,7 @@ describe('standalone surf physics', () => {
     },
   );
 
-  it('does not reset Canyon during the opening drop toward its first catch', () => {
+  it('uses one broad failure floor without resetting a valid Canyon opening drop', () => {
     const level = SURF_LEVELS.find((candidate) => candidate.id === 'canyon-signal')!;
     const overlook = level.ramps.find((ramp) => ramp.id === 'map03-overlook')!;
     const basis = getRampBasis(overlook);
@@ -953,23 +1272,43 @@ describe('standalone surf physics', () => {
     state.surfingStarted = true;
 
     const afterLaunch = stepSurfPlayer(state, input(), level, SURF_TUNING.fixedStep);
-    const withDefaultThreshold = stepSurfPlayer(
-      state,
-      input(),
-      {
-        ...level,
-        world: {
-          ...level.world!,
-          resetDropDistance: SURF_TUNING.resetDropDistance,
-        },
-      },
-      SURF_TUNING.fixedStep,
-    );
-
-    expect(level.world?.resetDropDistance).toBe(32);
+    const resetDropDistance = level.world?.resetDropDistance
+      ?? SURF_TUNING.resetDropDistance;
+    expect(resetDropDistance).toBe(32);
     expect(afterLaunch.resets).toBe(0);
     expect(afterLaunch.contactState).toBe('air');
-    expect(withDefaultThreshold.resets).toBe(1);
+
+    const oldLocalThreshold = Math.min(overlook.startY, overlook.endY)
+      - resetDropDistance;
+    const floor = failureVolumeHeight(level);
+    expect(floor).toBeLessThan(oldLocalThreshold);
+
+    const stillValid = createSurfPlayer(level);
+    stillValid.position.copy(state.position);
+    stillValid.position.y = oldLocalThreshold - 4;
+    stillValid.velocity.set(0, -1, 0);
+    stillValid.contactState = 'air';
+    stillValid.contactRampId = undefined;
+    stillValid.contactGraceRemaining = 0;
+    stillValid.surfingStarted = true;
+    expect(stepSurfPlayer(
+      stillValid,
+      input(),
+      level,
+      SURF_TUNING.fixedStep,
+    ).resets).toBe(0);
+
+    const failed = createSurfPlayer(level);
+    failed.position.copy(state.position);
+    failed.position.y = floor - 1;
+    failed.velocity.set(0, -1, 0);
+    failed.contactState = 'air';
+    failed.contactRampId = undefined;
+    failed.contactGraceRemaining = 0;
+    failed.surfingStarted = true;
+    const reset = stepSurfPlayer(failed, input(), level, SURF_TUNING.fixedStep);
+    expect(reset.resets).toBe(1);
+    expect(reset.position.distanceTo(level.spawn.position)).toBeLessThan(1e-8);
   });
 
   it('applies a mouse delta once even across multiple fixed substeps', () => {
@@ -1065,7 +1404,15 @@ describe('standalone surf physics', () => {
           width: ramp.dual?.totalWidth ?? ramp.width,
         };
       }),
-      events: outcome.events.slice(0, 100),
+      events: [
+        ...outcome.events.slice(0, 50),
+        ...outcome.events.slice(-50),
+      ],
+      lateEvents: outcome.events.filter((event) => (
+        event.includes('final-rise')
+        || event.includes('crown')
+        || event.includes('finish')
+      )),
     });
     expect(outcome.furthestRouteIndex, diagnostics).toBe(authoredRoute.length - 1);
     expect(outcome.state.complete, diagnostics).toBe(true);

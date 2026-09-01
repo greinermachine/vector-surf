@@ -225,8 +225,6 @@ export const SWITCHYARD_MAP: SurfLevel = {
   routeLinks,
   goal: {
     rampId: landing.id,
-    position: mapEyePosition(landing, 0, 70),
-    radius: 11,
   },
   world: {
     kind: 'switchyard-map',

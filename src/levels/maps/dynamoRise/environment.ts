@@ -98,7 +98,7 @@ function addTowerDetails(pieces: DynamoTransform[], towers: readonly DynamoTrans
         tower.zone,
         'window-band',
       ));
-      if ([0, 8, 14, 17, 18, 19].includes(index)) {
+      if ([0, 8, 14, 17, 18].includes(index)) {
         pieces.push(piece(
           [tower.position[0], top + 3, tower.position[2]],
           [tower.scale[0] * 0.56, 6, tower.scale[2] * 0.56],

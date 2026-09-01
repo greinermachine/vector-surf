@@ -1,15 +1,11 @@
-import { useFrame } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   BufferGeometry,
   Color,
   DoubleSide,
   Float32BufferAttribute,
-  Group,
-  Mesh,
   Vector3,
 } from 'three';
-import { SURF_TUNING } from '../game/config';
 import {
   primaryRouteRamp,
   rampRouteGroups,
@@ -17,7 +13,8 @@ import {
   routeGroupPoint,
   type RampRouteGroup,
 } from '../game/course';
-import { getRampBasis, rampHeading, rampSurfacePoint } from '../game/ramp';
+import { getRampBasis, rampSurfacePoint } from '../game/ramp';
+import { failureVolumeHeight } from '../game/physics';
 import {
   makeCenterStrip,
   makeDualRidgeGeometry,
@@ -78,14 +75,18 @@ function RampMesh({
         <meshStandardMaterial
           color={ramp.color}
           emissive={ramp.color}
-          emissiveIntensity={0.12}
+          emissiveIntensity={ramp.kind === 'landing' ? 0.3 : 0.12}
           roughness={0.68}
           metalness={0.32}
           side={DoubleSide}
         />
       </mesh>
       <lineSegments geometry={marks}>
-        <lineBasicMaterial color={ramp.edgeColor} transparent opacity={0.2} />
+        <lineBasicMaterial
+          color={ramp.edgeColor}
+          transparent
+          opacity={ramp.kind === 'landing' ? 0.42 : 0.2}
+        />
       </lineSegments>
       {showCenterStrip && (
         <mesh geometry={strip}>
@@ -289,37 +290,6 @@ function Architecture({ level }: { level: SurfLevel }) {
   );
 }
 
-function FinishGate({ level }: { level: SurfLevel }) {
-  const ramp = level.ramps.find((candidate) => candidate.id === level.goal.rampId)!;
-  const inner = useRef<Mesh>(null);
-  const outer = useRef<Group>(null);
-  useFrame(({ clock }, delta) => {
-    if (outer.current) outer.current.rotation.z += delta * 0.12;
-    if (inner.current) {
-      const pulse = 1 + Math.sin(clock.elapsedTime * 2.4) * 0.035;
-      inner.current.scale.setScalar(pulse);
-    }
-  });
-  return (
-    <group position={level.goal.position} rotation={[0, rampHeading(ramp), 0]}>
-      <group ref={outer}>
-        <mesh>
-          <torusGeometry args={[level.goal.radius, 0.18, 8, 72]} />
-          <meshBasicMaterial color={level.palette.accent} transparent opacity={0.94} fog={false} />
-        </mesh>
-        <mesh rotation={[0, 0, Math.PI / 4]}>
-          <torusGeometry args={[level.goal.radius + 0.55, 0.04, 6, 4]} />
-          <meshBasicMaterial color={level.palette.accentHot} transparent opacity={0.42} fog={false} />
-        </mesh>
-      </group>
-      <mesh ref={inner} position={[0, 0, 0.12]}>
-        <circleGeometry args={[level.goal.radius * 0.92, 64]} />
-        <meshBasicMaterial color={level.palette.accent} transparent opacity={0.055} depthWrite={false} />
-      </mesh>
-    </group>
-  );
-}
-
 function VelocityStreaks({ level }: { level: SurfLevel }) {
   const geometry = useMemo(() => {
     const positions: number[] = [];
@@ -390,6 +360,7 @@ export function CourseWorld({
   activeRampId?: string;
 }) {
   const bounds = useMemo(() => courseBounds(level), [level]);
+  const failureHeight = useMemo(() => failureVolumeHeight(level), [level]);
   const environment = (() => {
     switch (level.world?.kind) {
       case 'alpine-map':
@@ -411,10 +382,9 @@ export function CourseWorld({
       <CourseRamps level={level} debug={debug} activeRampId={activeRampId} />
       <RouteConnectors level={level} />
       {environment}
-      <FinishGate level={level} />
       <VelocityStreaks level={level} />
       <mesh
-        position={[bounds.centerX, SURF_TUNING.resetHeight - 2, bounds.centerZ]}
+        position={[bounds.centerX, failureHeight - 2, bounds.centerZ]}
         rotation={[-Math.PI / 2, 0, 0]}
       >
         <planeGeometry args={[bounds.width, bounds.depth, 1, 1]} />

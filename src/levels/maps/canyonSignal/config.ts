@@ -104,7 +104,8 @@ const daylightApproach = followingMapBank(cavernSweep, {
 });
 const daylightCatch = followingMapBank(daylightApproach, {
   id: 'map03-daylight-catch', heading: 2.75, length: 96, profile: 'wide-catch',
-  drop: 19, bankDirection: -1, gap: 72, entryDrop: 32, width: 64,
+  drop: 19, bankDirection: -1, gap: 72, entryDrop: 32,
+  width: 76, entryFraction: 0.12,
   color: slate, edgeColor: cyan,
 });
 
@@ -186,8 +187,6 @@ export const CANYON_SIGNAL_MAP: SurfLevel = {
   ],
   goal: {
     rampId: landing.id,
-    position: mapEyePosition(landing, 0, 65),
-    radius: 10,
   },
   world: {
     kind: 'canyon-signal-map',

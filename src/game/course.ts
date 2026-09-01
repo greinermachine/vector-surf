@@ -88,3 +88,19 @@ export function routeTransferDistance(
 ) {
   return routeGroupPoint(from, true).distanceTo(routeGroupPoint(to, false));
 }
+
+export function finishPlatformRamp(level: SurfLevel): RampDefinition {
+  const ramp = level.ramps.find((candidate) => candidate.id === level.goal.rampId);
+  if (!ramp || ramp.kind !== 'landing') {
+    throw new Error(`Level ${level.id} must name one landing ramp as its finish platform.`);
+  }
+  return ramp;
+}
+
+export function finishPlatformPoint(
+  level: SurfLevel,
+  target = new Vector3(),
+) {
+  const ramp = finishPlatformRamp(level);
+  return rampSurfacePoint(ramp, 0, getRampBasis(ramp).length * 0.55, target);
+}
